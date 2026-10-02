@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loadline.dev/schema/loadline.schema.json",
+  "title": "LoadlineDocument",
+  "description": "Схема Loadline: компоненты, связи и входящий трафик. Формат открытый и версионированный.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "version", "traffic", "nodes", "edges"],
+  "properties": {
+    "format": { "const": "loadline" },
+    "version": { "const": 1 },
+    "meta": { "$ref": "#/$defs/Meta" },
+    "traffic": { "$ref": "#/$defs/Traffic" },
+    "nodes": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/Node" }
+    },
+    "edges": {
+      "type": "array",
+      "maxItems": 2000,
+      "items": { "$ref": "#/$defs/Edge" }
+    }
+  },
+  "$defs": {
+    "Meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "maxLength": 200 },
+        "description": { "type": "string", "maxLength": 4000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Traffic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rps"],
+      "properties": {
+        "rps": { "type": "number", "minimum": 0, "maximum": 100000000, "description": "Входящий поток, запросов в секунду" },
+        "readShare": { "type": "number", "minimum": 0, "maximum": 1, "default": 1, "description": "Доля чтений в потоке" },
+        "spike": { "type": "number", "minimum": 1, "maximum": 100, "default": 1, "description": "Множитель всплеска (кнопка Spike ×4)" }
+      }
+    },
+    "NodeKind": {
+      "type": "string",
+      "enum": [
+        "client",
+        "cdn",
+        "load-balancer",
+        "api-gateway",
+        "service",
+        "worker",
+        "cache",
+        "sql-primary",
+        "sql-replica",
+        "nosql",
+        "queue",
+        "object-storage",
+        "search"
+      ]
+    },
+    "Position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      }
+    },
+    "NodeParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "replicas": { "type": "integer", "minimum": 1, "maximum": 10000, "default": 1 },
+        "capacityRps": { "type": "number", "exclusiveMinimum": 0, "description": "μ — ёмкость одной реплики, rps. Если не задана, берётся из пресета" },
+        "baseLatencyMs": { "type": "number", "minimum": 0, "description": "t₀ — время обработки без очереди, мс" },
+        "hitRatio": { "type": "number", "minimum": 0, "maximum": 1, "description": "Доля попаданий для cache и cdn" },
+        "costPerReplicaUsd": { "type": "number", "minimum": 0, "description": "Стоимость одной реплики в месяц, USD" },
+        "outage": { "type": "boolean", "default": false, "description": "Тумблер «Simulate outage»" }
+      }
+    },
+    "Node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "pos"],
+      "properties": {
+        "id": { "$ref": "#/$defs/Id" },
+        "kind": { "$ref": "#/$defs/NodeKind" },
+        "label": { "type": "string", "maxLength": 80 },
+        "preset": { "type": "string", "maxLength": 80, "description": "Идентификатор пресета из spec/presets" },
+        "pos": { "$ref": "#/$defs/Position" },
+        "params": { "$ref": "#/$defs/NodeParams" }
+      }
+    },
+    "Edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to"],
+      "properties": {
+        "id": { "$ref": "#/$defs/Id" },
+        "from": { "$ref": "#/$defs/PortRef" },
+        "to": { "$ref": "#/$defs/PortRef" },
+        "mode": { "type": "string", "enum": ["sequential", "parallel"], "default": "sequential" }
+      }
+    },
+    "Id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+    "PortRef": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,64}:(in|out)$",
+      "description": "Ссылка на порт узла: <nodeId>:in или <nodeId>:out"
+    }
+  }
+}

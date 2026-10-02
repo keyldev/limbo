@@ -1,0 +1,50 @@
+# Прод для MVP: один VPS, Postgres + API + Caddy (TLS из коробки).
+# Фронт живёт отдельно на Cloudflare Pages.
+#
+#   cp deploy/.env.example deploy/.env   # заполнить
+#   docker compose -f deploy/compose.yaml --env-file deploy/.env up -d --build
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: loadline
+      POSTGRES_USER: loadline
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в .env}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loadline -d loadline"]
+      interval: 10s
+      retries: 5
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/api.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__loadline: Host=postgres;Database=loadline;Username=loadline;Password=${POSTGRES_PASSWORD}
+      Cors__Origins__0: ${WEB_ORIGIN:?задайте WEB_ORIGIN в .env}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [api]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?задайте API_DOMAIN в .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+
+volumes:
+  pg-data:
+  caddy-data:

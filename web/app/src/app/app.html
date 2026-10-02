@@ -1,0 +1,62 @@
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">◆</span>
+    <span>Loadline</span>
+  </div>
+
+  <label class="field">
+    <span>Сценарий</span>
+    <select [value]="scenarioFile()" (change)="loadScenario($any($event.target).value)">
+      @for (s of spec.scenarios; track s.file) {
+        <option [value]="s.file">{{ s.title }}</option>
+      }
+    </select>
+  </label>
+
+  <label class="field grow">
+    <span>Трафик</span>
+    <input
+      type="range"
+      min="0"
+      max="20000"
+      step="100"
+      [value]="rps()"
+      (input)="setRps(+$any($event.target).value)"
+    />
+    <span class="mono">{{ rps() }} rps</span>
+  </label>
+
+  <button type="button" class="btn" [class.active]="spiking()" (click)="toggleSpike()">Spike ×4</button>
+  <button type="button" class="btn ghost" (click)="toggleTheme()">
+    {{ theme() === 'dark' ? 'Светлая тема' : 'Тёмная тема' }}
+  </button>
+</header>
+
+<main class="layout">
+  <section class="board" aria-label="Доска">
+    <ll-board-preview
+      [doc]="sim.doc()"
+      [result]="sim.result()"
+      [selectedId]="selectedId()"
+      (select)="selectedId.set($event)"
+    />
+  </section>
+
+  <aside class="side">
+    <section class="card">
+      <h2>Система</h2>
+      <ll-metrics-panel [result]="sim.result()" />
+    </section>
+    <section class="card">
+      <ll-inspector
+        [node]="selectedNode()"
+        [result]="sim.result()"
+        [presets]="sim.presets()"
+        (change)="applyNodeChange($event)"
+      />
+    </section>
+    @if (sim.error(); as err) {
+      <p class="error">{{ err }}</p>
+    }
+  </aside>
+</main>

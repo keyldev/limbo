@@ -1,0 +1,22 @@
+# Корень
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# Фронт
+web/**/node_modules/
+web/**/dist/
+web/**/.angular/
+web/app/public/spec/
+web/**/coverage/
+
+# .NET
+server/**/bin/
+server/**/obj/
+server/**/*.user
+server/**/TestResults/
+.vs/
+
+# Деплой
+deploy/.env

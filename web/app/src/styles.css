@@ -1,0 +1,85 @@
+/*
+ * Дизайн-токены Loadline. Принципы — в docs/design.md:
+ * графит, один акцент, цвет означает состояние, тёмная тема по умолчанию.
+ * Тема переключается атрибутом data-theme на <html>; без него — по prefers-color-scheme.
+ */
+
+:root {
+  /* Тёмная (по умолчанию) */
+  --ll-bg: #15171a;
+  --ll-surface: #1d2024;
+  --ll-surface-2: #262a2f;
+  --ll-border: #33383e;
+  --ll-text: #e6e8eb;
+  --ll-text-muted: #9aa1a9;
+  --ll-accent: #6ea8fe;
+
+  /* Состояние загрузки: только для загрузки и ничего больше */
+  --ll-ok: #4cc38a;
+  --ll-warm: #e5b445;
+  --ll-hot: #ef5b5b;
+  --ll-down: #6b7178;
+
+  --ll-radius: 8px;
+  --ll-font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ll-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --ll-bg: #f4f5f7;
+    --ll-surface: #ffffff;
+    --ll-surface-2: #eceef1;
+    --ll-border: #d5d9de;
+    --ll-text: #1b1e22;
+    --ll-text-muted: #5d646c;
+    --ll-accent: #2f6fde;
+    --ll-ok: #1f9d63;
+    --ll-warm: #b7860f;
+    --ll-hot: #d43c3c;
+    --ll-down: #8a9097;
+    color-scheme: light;
+  }
+}
+
+:root[data-theme='light'] {
+  --ll-bg: #f4f5f7;
+  --ll-surface: #ffffff;
+  --ll-surface-2: #eceef1;
+  --ll-border: #d5d9de;
+  --ll-text: #1b1e22;
+  --ll-text-muted: #5d646c;
+  --ll-accent: #2f6fde;
+  --ll-ok: #1f9d63;
+  --ll-warm: #b7860f;
+  --ll-hot: #d43c3c;
+  --ll-down: #8a9097;
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ll-bg);
+  color: var(--ll-text);
+  font-family: var(--ll-font);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}

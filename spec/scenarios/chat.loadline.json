@@ -1,0 +1,25 @@
+{
+  "format": "loadline",
+  "version": 1,
+  "meta": {
+    "title": "Чат",
+    "description": "Эталонный сценарий: сервис параллельно пишет историю в NoSQL и кладёт сообщение в очередь. Воркеры доставки нарочно не успевают: за очередью копится backlog, а клиент этого не видит.",
+    "createdAt": "2026-10-02T12:00:00Z"
+  },
+  "traffic": { "rps": 3000, "readShare": 0.6, "spike": 1 },
+  "nodes": [
+    { "id": "client", "kind": "client", "preset": "client.default", "pos": { "x": 40, "y": 220 } },
+    { "id": "gw", "kind": "api-gateway", "preset": "gateway.default", "pos": { "x": 200, "y": 220 } },
+    { "id": "api", "kind": "service", "preset": "service.small", "pos": { "x": 360, "y": 220 }, "params": { "replicas": 4 } },
+    { "id": "history", "kind": "nosql", "preset": "nosql.default", "pos": { "x": 540, "y": 120 } },
+    { "id": "queue", "kind": "queue", "preset": "queue.default", "pos": { "x": 540, "y": 320 } },
+    { "id": "delivery", "kind": "worker", "preset": "worker.small", "pos": { "x": 720, "y": 320 }, "params": { "replicas": 3 } }
+  ],
+  "edges": [
+    { "id": "e1", "from": "client:out", "to": "gw:in" },
+    { "id": "e2", "from": "gw:out", "to": "api:in" },
+    { "id": "e3", "from": "api:out", "to": "history:in", "mode": "parallel" },
+    { "id": "e4", "from": "api:out", "to": "queue:in", "mode": "parallel" },
+    { "id": "e5", "from": "queue:out", "to": "delivery:in" }
+  ]
+}

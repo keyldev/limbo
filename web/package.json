@@ -1,0 +1,17 @@
+{
+  "name": "loadline-web",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "start": "pnpm --filter @loadline/app start",
+    "gen:model": "pnpm --filter @loadline/model generate",
+    "gen:api": "pnpm --filter @loadline/api-client generate",
+    "gen": "pnpm gen:model && pnpm gen:api",
+    "lint": "pnpm -r lint"
+  }
+}

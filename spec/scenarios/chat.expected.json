@@ -1,0 +1,8 @@
+{
+  "errorRate": 0,
+  "meanLatencyMs": 92.75023428387334,
+  "p95Ms": 255.27893944724212,
+  "p99Ms": 382.6468044217075,
+  "costMonthlyUsd": 710,
+  "bottleneckId": "delivery"
+}

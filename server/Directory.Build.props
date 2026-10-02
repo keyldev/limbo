@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Включите TreatWarningsAsErrors после первой зелёной сборки на вашей машине -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <!-- Путь к общей спецификации в корне репозитория -->
+    <LoadlineSpecDir>$(MSBuildThisFileDirectory)..\spec\</LoadlineSpecDir>
+  </PropertyGroup>
+</Project>

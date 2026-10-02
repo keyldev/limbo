@@ -1,0 +1,23 @@
+{
+  "format": "loadline",
+  "version": 1,
+  "meta": {
+    "title": "Сокращатель ссылок",
+    "description": "Эталонный сценарий: балансировщик, сервис, кэш перед SQL. Чтения 90%.",
+    "createdAt": "2026-10-02T12:00:00Z"
+  },
+  "traffic": { "rps": 2000, "readShare": 0.9, "spike": 1 },
+  "nodes": [
+    { "id": "client", "kind": "client", "preset": "client.default", "pos": { "x": 40, "y": 200 } },
+    { "id": "lb", "kind": "load-balancer", "preset": "lb.default", "pos": { "x": 200, "y": 200 }, "params": { "replicas": 1 } },
+    { "id": "api", "kind": "service", "preset": "service.small", "pos": { "x": 380, "y": 200 }, "params": { "replicas": 3 } },
+    { "id": "cache", "kind": "cache", "preset": "cache.redis-small", "pos": { "x": 560, "y": 120 }, "params": { "replicas": 1, "hitRatio": 0.8 } },
+    { "id": "db", "kind": "sql-primary", "preset": "sql.primary-medium", "pos": { "x": 740, "y": 200 }, "params": { "replicas": 1 } }
+  ],
+  "edges": [
+    { "id": "e1", "from": "client:out", "to": "lb:in" },
+    { "id": "e2", "from": "lb:out", "to": "api:in" },
+    { "id": "e3", "from": "api:out", "to": "cache:in" },
+    { "id": "e4", "from": "cache:out", "to": "db:in" }
+  ]
+}

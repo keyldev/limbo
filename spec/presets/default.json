@@ -1,0 +1,19 @@
+{
+  "$comment": "Стартовые пресеты. Значения грубые и НЕ откалиброваны: калибровка по бенчмаркам — этап 2. Для каждого пресета нужен source со ссылкой на бенчмарк.",
+  "version": 1,
+  "presets": [
+    { "id": "client.default", "kind": "client", "capacityRps": 1e12, "baseLatencyMs": 0, "costPerReplicaUsd": 0, "calibrated": false, "source": null },
+    { "id": "cdn.default", "kind": "cdn", "capacityRps": 1000000, "baseLatencyMs": 15, "hitRatio": 0.9, "costPerReplicaUsd": 50, "calibrated": false, "source": null },
+    { "id": "lb.default", "kind": "load-balancer", "capacityRps": 50000, "baseLatencyMs": 1, "costPerReplicaUsd": 20, "calibrated": false, "source": null },
+    { "id": "gateway.default", "kind": "api-gateway", "capacityRps": 20000, "baseLatencyMs": 3, "costPerReplicaUsd": 40, "calibrated": false, "source": null },
+    { "id": "service.small", "kind": "service", "capacityRps": 1000, "baseLatencyMs": 20, "costPerReplicaUsd": 60, "calibrated": false, "source": null },
+    { "id": "worker.small", "kind": "worker", "capacityRps": 300, "baseLatencyMs": 80, "costPerReplicaUsd": 60, "calibrated": false, "source": null },
+    { "id": "cache.redis-small", "kind": "cache", "capacityRps": 80000, "baseLatencyMs": 1, "hitRatio": 0.8, "costPerReplicaUsd": 90, "calibrated": false, "source": null },
+    { "id": "sql.primary-medium", "kind": "sql-primary", "capacityRps": 3000, "baseLatencyMs": 5, "costPerReplicaUsd": 250, "calibrated": false, "source": null },
+    { "id": "sql.replica-medium", "kind": "sql-replica", "capacityRps": 4000, "baseLatencyMs": 4, "costPerReplicaUsd": 200, "calibrated": false, "source": null },
+    { "id": "nosql.default", "kind": "nosql", "capacityRps": 10000, "baseLatencyMs": 6, "costPerReplicaUsd": 180, "calibrated": false, "source": null },
+    { "id": "queue.default", "kind": "queue", "capacityRps": 30000, "baseLatencyMs": 2, "costPerReplicaUsd": 70, "calibrated": false, "source": null },
+    { "id": "storage.object", "kind": "object-storage", "capacityRps": 5000, "baseLatencyMs": 40, "costPerReplicaUsd": 25, "calibrated": false, "source": null },
+    { "id": "search.default", "kind": "search", "capacityRps": 2000, "baseLatencyMs": 25, "costPerReplicaUsd": 220, "calibrated": false, "source": null }
+  ]
+}

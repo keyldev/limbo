@@ -1,0 +1,20 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.0.0">
+  <!--
+    Локальный запуск одной командой: dotnet run --project src/Loadline.AppHost
+    Поднимает PostgreSQL в контейнере и API; фронт запускается отдельно: pnpm start в web/.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsAspireHost>true</IsAspireHost>
+    <UserSecretsId>loadline-apphost</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Loadline.Api\Loadline.Api.csproj" />
+  </ItemGroup>
+</Project>

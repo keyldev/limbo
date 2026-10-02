@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Фронт и движок
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+
+      - name: Типы из JSON Schema совпадают с закоммиченными
+        run: |
+          pnpm gen:model
+          git diff --exit-code -- packages/model/src
+
+      - run: pnpm build
+      - run: pnpm test
+
+  server:
+    name: Сервер .NET
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: server/global.json
+      - run: dotnet restore Loadline.slnx
+      - run: dotnet build Loadline.slnx --no-restore -c Release
+      # Testcontainers использует Docker раннера GitHub
+      - run: dotnet test Loadline.slnx --no-build -c Release
+
+      - name: OpenAPI совпадает с закоммиченным
+        run: git diff --exit-code -- src/Loadline.Api/openapi
+
+  docker:
+    name: Образ API собирается
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f deploy/api.Dockerfile .

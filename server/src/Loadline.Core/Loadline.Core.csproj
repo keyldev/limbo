@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Loadline.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JsonSchema.Net" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Та же JSON Schema, что у клиента: один источник правды -->
+    <EmbeddedResource Include="$(LoadlineSpecDir)loadline.schema.json" LogicalName="Loadline.Core.loadline.schema.json" Link="Schema\loadline.schema.json" />
+  </ItemGroup>
+</Project>

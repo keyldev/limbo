@@ -1,0 +1,27 @@
+{
+  "name": "@loadline/api-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Клиент API Loadline. Типы эндпоинтов генерируются из OpenAPI 3.1, который выпускает сборка server/src/Loadline.Api.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "generate": "openapi-typescript ../../../server/src/Loadline.Api/openapi/Loadline.Api.json -o src/openapi.generated.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "echo \"no tests\""
+  },
+  "dependencies": {
+    "@loadline/model": "workspace:*"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.0.0",
+    "typescript": "~6.0.2"
+  }
+}

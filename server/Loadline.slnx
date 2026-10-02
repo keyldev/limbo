@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Loadline.Api/Loadline.Api.csproj" />
+    <Project Path="src/Loadline.Core/Loadline.Core.csproj" />
+    <Project Path="src/Loadline.Data/Loadline.Data.csproj" />
+    <Project Path="src/Loadline.AppHost/Loadline.AppHost.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Loadline.Core.Tests/Loadline.Core.Tests.csproj" />
+    <Project Path="tests/Loadline.Api.Tests/Loadline.Api.Tests.csproj" />
+  </Folder>
+</Solution>

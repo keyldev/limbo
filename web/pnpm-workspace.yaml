@@ -1,0 +1,10 @@
+packages:
+  - app
+  - packages/*
+
+# Пакеты, которым разрешены install-скрипты (нативные бинарники сборщика Angular)
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - esbuild
+  - lmdb
+  - msgpackr-extract
