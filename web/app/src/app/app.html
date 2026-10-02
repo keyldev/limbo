@@ -6,10 +6,13 @@
 
   <label class="field">
     <span>Сценарий</span>
-    <select [value]="scenarioFile()" (change)="loadScenario($any($event.target).value)">
+    <select (change)="loadScenario($any($event.target).value)">
       @for (s of spec.scenarios; track s.file) {
-        <option [value]="s.file">{{ s.title }}</option>
+        <option [value]="s.file" [selected]="s.file === scenarioFile()">{{ s.title }}</option>
       }
+      <option [value]="stressScenario" [selected]="scenarioFile() === stressScenario">
+        Стресс: 200 узлов
+      </option>
     </select>
   </label>
 
@@ -26,7 +29,39 @@
     <span class="mono">{{ rps() }} rps</span>
   </label>
 
-  <button type="button" class="btn" [class.active]="spiking()" (click)="toggleSpike()">Spike ×4</button>
+  <label class="field">
+    <span>Доска</span>
+    <select (change)="setBoard($any($event.target).value)">
+      @for (b of boards; track b.kind) {
+        <option [value]="b.kind" [selected]="b.kind === board()">{{ b.title }}</option>
+      }
+    </select>
+  </label>
+
+  <div class="group" role="group" aria-label="История">
+    <button
+      type="button"
+      class="btn ghost"
+      [disabled]="!history.canUndo()"
+      (click)="undo()"
+      title="Отменить (Ctrl+Z)"
+    >
+      ↶
+    </button>
+    <button
+      type="button"
+      class="btn ghost"
+      [disabled]="!history.canRedo()"
+      (click)="redo()"
+      title="Повторить (Ctrl+Shift+Z)"
+    >
+      ↷
+    </button>
+  </div>
+
+  <button type="button" class="btn" [class.active]="spiking()" (click)="toggleSpike()">
+    Spike ×4
+  </button>
   <button type="button" class="btn ghost" (click)="toggleTheme()">
     {{ theme() === 'dark' ? 'Светлая тема' : 'Тёмная тема' }}
   </button>
@@ -34,12 +69,49 @@
 
 <main class="layout">
   <section class="board" aria-label="Доска">
-    <ll-board-preview
-      [doc]="sim.doc()"
-      [result]="sim.result()"
-      [selectedId]="selectedId()"
-      (select)="selectedId.set($event)"
-    />
+    @switch (board()) {
+      @case ('foblex') {
+        @defer (on immediate) {
+          <ll-board-foblex
+            [doc]="sim.doc()"
+            [result]="sim.result()"
+            [fitKey]="loadCount()"
+            [selection]="selection()"
+            (selectionChange)="selectSelection($event)"
+            (move)="onMove($event)"
+            (connect)="onConnect($event)"
+            (reconnect)="onReconnect($event)"
+          />
+        } @loading {
+          <p class="board-loading">Загружаю доску…</p>
+        }
+      }
+      @case ('vflow') {
+        @defer (on immediate) {
+          <ll-board-vflow
+            [doc]="sim.doc()"
+            [result]="sim.result()"
+            [fitKey]="loadCount()"
+            [selection]="selection()"
+            (selectionChange)="selectSelection($event)"
+            (move)="onMove($event)"
+            (connect)="onConnect($event)"
+            (reconnect)="onReconnect($event)"
+          />
+        } @loading {
+          <p class="board-loading">Загружаю доску…</p>
+        }
+      }
+      @default {
+        <ll-board-preview
+          [doc]="sim.doc()"
+          [result]="sim.result()"
+          [selectedId]="selectedId()"
+          (select)="selectSelection({ nodeId: $event, edgeId: null })"
+        />
+      }
+    }
+    <ll-fps-meter />
   </section>
 
   <aside class="side">

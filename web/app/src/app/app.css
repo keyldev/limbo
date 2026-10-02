@@ -65,6 +65,16 @@ select {
   cursor: pointer;
 }
 
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.group {
+  display: flex;
+  gap: 4px;
+}
+
 .btn.active {
   border-color: var(--ll-hot);
   color: var(--ll-hot);
@@ -81,9 +91,9 @@ select {
 }
 
 .board {
-  padding: 16px;
+  position: relative;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .side {
@@ -117,4 +127,9 @@ select {
     border-left: 0;
     border-top: 1px solid var(--ll-border);
   }
+}
+
+.board-loading {
+  margin: 16px;
+  color: var(--ll-text-muted);
 }

@@ -1,0 +1,120 @@
+/*
+ * Общие стили досок-прототипов (ADR 0003). Глобальные, потому что обе библиотеки
+ * рисуют узлы и связи вне инкапсуляции компонента.
+ * Цвета только из токенов --ll-*: тема Loadline переключает обе доски сразу.
+ */
+
+@use '@foblex/flow/styles' as flow;
+
+/* ---------- Foblex Flow: каркас и связи из темы библиотеки, цвета наши ---------- */
+
+:root {
+  @include flow.theme-tokens();
+}
+
+f-flow {
+  --ff-flow-background-color: var(--ll-bg);
+  --ff-canvas-background-color: transparent;
+  --ff-flow-text-color: var(--ll-text);
+  --ff-flow-font-family: var(--ll-font);
+  --ff-background-dot-color: var(--ll-border);
+  --ff-connection-color: var(--ll-text-muted);
+  --ff-connection-width: 1.5px;
+  --ff-connection-hit-width: 14px;
+  --ff-connection-hover-color: color-mix(in srgb, var(--ll-accent) 25%, transparent);
+  --ff-connection-selected-color: var(--ll-accent);
+  --ff-marker-color: var(--ll-text-muted);
+  --ff-snap-connection-color: var(--ll-accent);
+  --ff-selection-area-color: color-mix(in srgb, var(--ll-accent) 12%, transparent);
+  --ff-selection-area-border-color: var(--ll-accent);
+}
+
+/* Карточки и порты рисуем сами, поэтому из темы берём только холст, связи и плагины. */
+@include flow.flow-canvas();
+@include flow.connection-all();
+@include flow.plugins();
+
+f-flow .f-connection.parallel .f-connection-path {
+  stroke-dasharray: 5 4;
+}
+
+/* ---------- Узел и порты: одинаковые в обоих прототипах ---------- */
+
+.ll-node-host {
+  position: relative;
+  width: 140px;
+  height: 56px;
+  cursor: grab;
+}
+
+.ll-node-host > ll-node-card {
+  transition: border-color 120ms;
+}
+
+.ll-node-host.f-selected > ll-node-card,
+.ll-node-host.selected > ll-node-card {
+  border-color: var(--ll-accent);
+  box-shadow: 0 0 0 1px var(--ll-accent);
+}
+
+.f-dragging .ll-node-host,
+.ll-node-host.f-dragging {
+  cursor: grabbing;
+}
+
+/* Порт-ромб: квадрат 10×10, повёрнутый на 45°, по центру боковой грани. */
+.ll-port {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  transform: rotate(45deg);
+  background: var(--ll-surface);
+  border: 1.5px solid var(--ll-text-muted);
+  z-index: 1;
+  cursor: crosshair;
+}
+
+.ll-port.in {
+  left: -6px;
+}
+
+.ll-port.out {
+  right: -6px;
+}
+
+.ll-port:hover,
+.ll-port.f-connector-connectable {
+  border-color: var(--ll-accent);
+  background: var(--ll-accent);
+}
+
+/* ---------- ngx-vflow ---------- */
+
+.ll-port-svg {
+  fill: var(--ll-surface);
+  stroke: var(--ll-text-muted);
+  stroke-width: 1.5;
+  cursor: crosshair;
+}
+
+.ll-port-svg:hover {
+  fill: var(--ll-accent);
+  stroke: var(--ll-accent);
+}
+
+vflow .edge {
+  stroke: var(--ll-text-muted);
+  stroke-width: 1.5;
+}
+
+vflow .edge_selected,
+vflow .edge.selected {
+  stroke: var(--ll-accent);
+}
+
+/* Цвет точек фона vflow задаёт SVG-атрибутом, а var() в атрибутах не работает: перекрываем CSS. */
+vflow pattern circle {
+  fill: var(--ll-border);
+}
