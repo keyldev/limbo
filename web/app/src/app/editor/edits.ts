@@ -163,3 +163,21 @@ export function setEdgeMode(
   if (!edge || (edge.mode ?? 'sequential') === mode) return doc;
   return { ...doc, edges: doc.edges.map((e) => (e.id === edgeId ? { ...e, mode } : e)) };
 }
+
+/** Какие запросы несёт связь. undefined — все: поле удаляется из документа. */
+export function setEdgeOnly(
+  doc: LoadlineDocument,
+  edgeId: string,
+  only: 'read' | 'write' | undefined,
+): LoadlineDocument {
+  const edge = doc.edges.find((e) => e.id === edgeId);
+  if (!edge || edge.only === only) return doc;
+  return {
+    ...doc,
+    edges: doc.edges.map((e) => {
+      if (e.id !== edgeId) return e;
+      const { only: _, ...rest } = e;
+      return only ? { ...rest, only } : rest;
+    }),
+  };
+}

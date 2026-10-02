@@ -28,6 +28,7 @@ describe('проверка документа', () => {
     doc.nodes.push({ id: 's', kind: 'robot' as 'service', pos: { x: 0, y: 0 } });
     (doc.nodes[1]!.params as Record<string, unknown>)['replicas'] = 0;
     doc.edges.push({ id: 'e2', from: 's:out', to: 'ghost:in' });
+    (doc.edges[0] as Record<string, unknown>)['only'] = 'both';
     (doc as Record<string, unknown>)['extra'] = true;
     const problems = validateDocument(doc);
     expect(problems).toEqual(
@@ -37,6 +38,7 @@ describe('проверка документа', () => {
         'nodes[2].kind: неизвестный тип',
         'nodes[1].params.replicas: не меньше 1',
         'edges[1].to: нет узла «ghost»',
+        'edges[0].only: read или write',
       ]),
     );
   });

@@ -102,7 +102,12 @@
         "id": { "$ref": "#/$defs/Id" },
         "from": { "$ref": "#/$defs/PortRef" },
         "to": { "$ref": "#/$defs/PortRef" },
-        "mode": { "type": "string", "enum": ["sequential", "parallel"], "default": "sequential" }
+        "mode": { "type": "string", "enum": ["sequential", "parallel"], "default": "sequential" },
+        "only": {
+          "type": "string",
+          "enum": ["read", "write"],
+          "description": "Связь несёт только чтения или только записи. Без поля — все запросы"
+        }
       }
     },
     "Id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },

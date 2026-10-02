@@ -45,6 +45,7 @@ export class SpecService {
     { file: 'url-shortener.loadline.json', title: 'Сокращатель ссылок' },
     { file: 'chat.loadline.json', title: 'Чат' },
     { file: 'telemetry.loadline.json', title: 'Телеметрия' },
+    { file: 'news-feed.loadline.json', title: 'Лента новостей' },
   ];
 
   async presets(): Promise<Preset[]> {

@@ -235,6 +235,42 @@
         </button>
       </div>
     }
+    <div class="seg three" role="radiogroup" aria-label="Какие запросы несёт">
+      <button
+        type="button"
+        role="radio"
+        [attr.aria-checked]="!e.only"
+        (click)="store.setEdgeOnly(edge()!.id, undefined)"
+      >
+        Все
+      </button>
+      <button
+        type="button"
+        role="radio"
+        [attr.aria-checked]="e.only === 'read'"
+        (click)="store.setEdgeOnly(edge()!.id, 'read')"
+      >
+        Чтения
+      </button>
+      <button
+        type="button"
+        role="radio"
+        [attr.aria-checked]="e.only === 'write'"
+        (click)="store.setEdgeOnly(edge()!.id, 'write')"
+      >
+        Записи
+      </button>
+    </div>
+    @if (e.only) {
+      <p class="note">
+        {{
+          e.only === 'read'
+            ? 'Записи сюда не идут: узел отправляет их по другим связям.'
+            : 'Чтения сюда не идут: узел отправляет их по другим связям.'
+        }}
+        Если подходящей связи нет, запрос заканчивается на узле.
+      </p>
+    }
     <div class="reads">
       <div class="read">
         <span>Поток</span><b>{{ fmt(e.rps) }} rps</b>

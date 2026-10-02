@@ -1,0 +1,35 @@
+{
+  "format": "loadline",
+  "version": 1,
+  "meta": {
+    "title": "Лента новостей",
+    "description": "Эталонный сценарий: чтений в 19 раз больше, чем публикаций, и они идут разными путями. Ленту собирают при чтении (fan-out на чтение): кэш ленты отвечает на 85% запросов, промахи собирает feed-builder параллельными запросами к постам и графу подписок. Публикация уходит в очередь, воркер раскладывает пост в хранилище и в кэш ленты, автор ответа не ждёт. Опустите hit ratio кэша ленты — и feed-builder захлебнётся.",
+    "createdAt": "2026-10-02T12:00:00Z"
+  },
+  "traffic": { "rps": 5000, "readShare": 0.95, "spike": 1 },
+  "nodes": [
+    { "id": "users", "kind": "client", "label": "Пользователи", "preset": "client.default", "pos": { "x": 0, "y": 252 } },
+    { "id": "lb", "kind": "load-balancer", "preset": "lb.default", "pos": { "x": 264, "y": 252 } },
+    { "id": "feed", "kind": "service", "label": "feed-api", "preset": "service.small", "pos": { "x": 528, "y": 120 }, "params": { "replicas": 7 } },
+    { "id": "fcache", "kind": "cache", "label": "feed-cache", "preset": "cache.redis-small", "pos": { "x": 792, "y": 120 }, "params": { "hitRatio": 0.85 } },
+    { "id": "builder", "kind": "service", "label": "feed-builder", "preset": "service.small", "pos": { "x": 1056, "y": 120 }, "params": { "replicas": 1 } },
+    { "id": "posts", "kind": "nosql", "label": "posts", "preset": "nosql.default", "pos": { "x": 1320, "y": 252 } },
+    { "id": "follows", "kind": "sql-replica", "label": "follows", "preset": "sql.replica-medium", "pos": { "x": 1320, "y": 36 } },
+    { "id": "post", "kind": "service", "label": "post-api", "preset": "service.small", "pos": { "x": 528, "y": 396 } },
+    { "id": "q", "kind": "queue", "label": "new-posts", "preset": "queue.default", "pos": { "x": 792, "y": 396 } },
+    { "id": "fanout", "kind": "worker", "label": "fanout", "preset": "worker.small", "pos": { "x": 1056, "y": 396 }, "params": { "replicas": 3, "capacityRps": 120 } }
+  ],
+  "edges": [
+    { "id": "e1", "from": "users:out", "to": "lb:in" },
+    { "id": "e2", "from": "lb:out", "to": "feed:in", "only": "read" },
+    { "id": "e3", "from": "lb:out", "to": "post:in", "only": "write" },
+    { "id": "e4", "from": "feed:out", "to": "fcache:in" },
+    { "id": "e5", "from": "fcache:out", "to": "builder:in", "only": "read" },
+    { "id": "e6", "from": "builder:out", "to": "posts:in", "mode": "parallel" },
+    { "id": "e7", "from": "builder:out", "to": "follows:in", "mode": "parallel" },
+    { "id": "e8", "from": "post:out", "to": "q:in" },
+    { "id": "e9", "from": "q:out", "to": "fanout:in" },
+    { "id": "e10", "from": "fanout:out", "to": "posts:in" },
+    { "id": "e11", "from": "fanout:out", "to": "fcache:in" }
+  ]
+}

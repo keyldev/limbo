@@ -20,6 +20,7 @@ import {
   removeEdge,
   removeNode,
   setEdgeMode,
+  setEdgeOnly,
   updateNode,
   type NodePatch,
 } from './edits';
@@ -237,6 +238,10 @@ export class EditorStore {
 
   setEdgeMode(edgeId: string, mode: 'sequential' | 'parallel'): void {
     this.apply((d) => setEdgeMode(d, edgeId, mode));
+  }
+
+  setEdgeOnly(edgeId: string, only: 'read' | 'write' | undefined): void {
+    this.apply((d) => setEdgeOnly(d, edgeId, only));
   }
 
   removeSelected(): void {

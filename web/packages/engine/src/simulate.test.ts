@@ -177,6 +177,34 @@ describe('маршрутизация потока', () => {
     expect(r.system.errorRate).toBe(0);
   });
 
+  it('чтения и записи идут по своим связям', () => {
+    const d = doc(
+      [at('c', 'client'), at('lb', 'load-balancer'), at('r', 'service', 2), at('w', 'service'), at('db', 'nosql')],
+      [['c', 'lb'], ['lb', 'r'], ['lb', 'w'], ['r', 'db'], ['w', 'db']],
+    );
+    d.traffic.readShare = 0.8;
+    d.edges[1]!.only = 'read';
+    d.edges[2]!.only = 'write';
+    const r = simulate(d, opts);
+    // Балансировщик не делит поток пополам: все чтения уходят в r, все записи в w.
+    expect(r.nodes['r']!.readRps).toBeCloseTo(800);
+    expect(r.nodes['r']!.writeRps).toBe(0);
+    expect(r.nodes['w']!.writeRps).toBeCloseTo(200);
+    expect(r.nodes['w']!.readRps).toBe(0);
+    expect(r.edges['e1']!.rps).toBeCloseTo(800);
+    expect(r.nodes['db']!.lambda).toBeCloseTo(1000);
+  });
+
+  it('запрос, для которого нет связи, заканчивается на узле', () => {
+    const d = doc([at('c', 'client'), at('a', 'service'), at('q', 'queue')], [['c', 'a'], ['a', 'q']]);
+    d.traffic.readShare = 0.5;
+    d.edges[1]!.only = 'write';
+    const r = simulate(d, opts);
+    expect(r.nodes['q']!.lambda).toBeCloseTo(500);
+    expect(r.nodes['q']!.readRps).toBe(0);
+    expect(r.system.errorRate).toBe(0);
+  });
+
   it('узел без трафика — idle и не узкое место', () => {
     const r = simulate(doc([at('c', 'client'), at('a', 'service'), at('lonely', 'nosql')], [['c', 'a']]), opts);
     expect(r.nodes['lonely']!.status).toBe('idle');

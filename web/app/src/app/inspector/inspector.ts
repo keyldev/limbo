@@ -81,6 +81,7 @@ export class Inspector {
       routingText: ROUTING_TEXT[routing],
       canBeParallel: routing === 'fanout',
       mode: e.mode ?? 'sequential',
+      only: e.only,
       rps: result?.edges[e.id]?.rps ?? 0,
       target: result?.nodes[toId],
     };

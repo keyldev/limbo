@@ -116,6 +116,11 @@ function shareOf(routing: Routing, outCount: number): number {
   return routing === 'split' && outCount > 0 ? 1 / outCount : 1;
 }
 
+/** Несёт ли связь запрос этого вида. Без only связь несёт и чтения, и записи. */
+export function carries(e: Edge, isRead: boolean): boolean {
+  return e.only === undefined || e.only === (isRead ? 'read' : 'write');
+}
+
 const STATUS_WARM = 0.7;
 const STATUS_HOT = 0.9;
 
@@ -254,13 +259,18 @@ function analyze(
     const downW = w * share;
     if (CACHING_KINDS.has(n.kind)) downR *= 1 - n.hitRatio;
 
+    // Чтения и записи идут каждое по своим связям: связь с only несёт только один вид запросов.
     const outs = g.out.get(id) ?? [];
-    const k = shareOf(routingOf(n.kind), outs.length);
+    const routing = routingOf(n.kind);
+    const kr = shareOf(routing, outs.filter((e) => carries(e, true)).length);
+    const kw = shareOf(routing, outs.filter((e) => carries(e, false)).length);
     for (const e of outs) {
       const to = nodeIdOf(e.to);
-      reads.set(to, (reads.get(to) ?? 0) + downR * k);
-      writes.set(to, (writes.get(to) ?? 0) + downW * k);
-      edges[e.id] = { id: e.id, rps: (downR + downW) * k };
+      const er = carries(e, true) ? downR * kr : 0;
+      const ew = carries(e, false) ? downW * kw : 0;
+      reads.set(to, (reads.get(to) ?? 0) + er);
+      writes.set(to, (writes.get(to) ?? 0) + ew);
+      edges[e.id] = { id: e.id, rps: er + ew };
     }
 
     const from = g.inbound.get(id)!;
@@ -326,7 +336,7 @@ function sampleRequest(
   const routing = routingOf(n.kind);
   if (routing === 'async') return t;
 
-  const edges = g.out.get(id) ?? [];
+  const edges = (g.out.get(id) ?? []).filter((e) => carries(e, isRead));
   if (edges.length === 0) return t;
 
   // split: запрос уходит ровно в одну связь, выбранную равновероятно.

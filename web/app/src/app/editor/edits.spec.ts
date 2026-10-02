@@ -8,6 +8,7 @@ import {
   removeEdge,
   removeNode,
   setEdgeMode,
+  setEdgeOnly,
   updateNode,
 } from './edits';
 import { History } from './history';
@@ -100,6 +101,14 @@ describe('правила связей и новые узлы', () => {
     const p = setEdgeMode(doc, 'e1', 'parallel');
     expect(p.edges[0]!.mode).toBe('parallel');
     expect(setEdgeMode(p, 'e1', 'parallel')).toBe(p);
+  });
+
+  it('какие запросы несёт связь', () => {
+    const r = setEdgeOnly(doc, 'e1', 'read');
+    expect(r.edges[0]!.only).toBe('read');
+    expect(setEdgeOnly(r, 'e1', 'read')).toBe(r);
+    const all = setEdgeOnly(r, 'e1', undefined);
+    expect('only' in all.edges[0]!).toBe(false);
   });
 });
 

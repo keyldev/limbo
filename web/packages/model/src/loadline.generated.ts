@@ -99,4 +99,8 @@ export interface Edge {
   from: PortRef;
   to: PortRef;
   mode?: "sequential" | "parallel";
+  /**
+   * Связь несёт только чтения или только записи. Без поля — все запросы
+   */
+  only?: "read" | "write";
 }

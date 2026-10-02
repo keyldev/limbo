@@ -154,7 +154,7 @@ export function validateDocument(doc: unknown): string[] {
         out.push(`${where}: нужен объект`);
         return;
       }
-      onlyKeys(e, ['id', 'from', 'to', 'mode'], where, out);
+      onlyKeys(e, ['id', 'from', 'to', 'mode', 'only'], where, out);
       const id = e['id'];
       if (typeof id !== 'string' || !ID.test(id)) out.push(`${where}.id: латиница, цифры, - и _, до 64 символов`);
       else if (edgeIds.has(id)) out.push(`${where}.id: повтор «${id}»`);
@@ -167,6 +167,9 @@ export function validateDocument(doc: unknown): string[] {
       }
       if (e['mode'] !== undefined && e['mode'] !== 'sequential' && e['mode'] !== 'parallel') {
         out.push(`${where}.mode: sequential или parallel`);
+      }
+      if (e['only'] !== undefined && e['only'] !== 'read' && e['only'] !== 'write') {
+        out.push(`${where}.only: read или write`);
       }
     });
   }

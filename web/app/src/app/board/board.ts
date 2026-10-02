@@ -94,7 +94,7 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
               <f-connection-marker-arrow type="end" />
               @if (showLabels() && e.rps > 0) {
                 <div fConnectionContent [position]="0.5" [offset]="-11" class="ll-elabel">
-                  {{ fmt(e.rps) }} rps
+                  {{ fmt(e.rps) }} rps{{ e.only ? ' · ' + e.only : '' }}
                 </div>
               }
             </f-connection>
@@ -297,6 +297,7 @@ export class Board {
         from: e.from,
         to: e.to,
         parallel: e.mode === 'parallel',
+        only: e.only === 'read' ? 'чтения' : e.only === 'write' ? 'записи' : '',
         rps,
         status: result?.nodes[nodeIdOfPort(e.to)]?.status ?? 'idle',
         width: rps > 0 ? Math.min(4, Math.max(1.4, 1.2 + Math.log10(rps + 1) * 0.7)) : 1.2,
