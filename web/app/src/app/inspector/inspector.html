@@ -5,7 +5,12 @@
     <p class="eyebrow"><ll-icon [kind]="n.kind" [size]="14" /> {{ kindLabel() }}</p>
     <label class="field">
       <span>Имя</span>
-      <input type="text" [value]="n.label ?? n.id" (input)="rename($any($event.target).value)" />
+      <input
+        type="text"
+        maxlength="80"
+        [value]="n.label ?? n.id"
+        (input)="rename($any($event.target).value)"
+      />
     </label>
     <p class="note">{{ routingText() }}</p>
 
@@ -247,7 +252,17 @@
   @let s = system();
   <div class="ins">
     <p class="eyebrow">Система</p>
-    <h2>Загрузка по узлам</h2>
+    <label class="field">
+      <span>Название схемы</span>
+      <input
+        type="text"
+        maxlength="200"
+        placeholder="Без названия"
+        [value]="store.doc()?.meta?.title ?? ''"
+        (input)="store.setTitle($any($event.target).value)"
+      />
+    </label>
+    <h2 class="sub">Загрузка по узлам</h2>
     <p class="note">
       Самые загруженные сверху. Выберите узел на доске, чтобы поменять реплики, ёмкость и задержку
       или отключить его.

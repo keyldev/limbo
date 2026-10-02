@@ -1,5 +1,5 @@
 import { DestroyRef, Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
-import type { LoadStatus, SimulationResult } from '@loadline/engine';
+import { DOCUMENT_LIMITS, type LoadStatus, type SimulationResult } from '@loadline/engine';
 import type { LoadlineDocument, NodeKind, Position } from '@loadline/model';
 import type {
   BoardConnect,
@@ -106,16 +106,32 @@ export class EditorStore {
 
   // ---------- загрузка и симуляция ----------
 
-  load(doc: LoadlineDocument): void {
-    this.history.clear();
+  /**
+   * Открыть другую схему. Прежняя уходит в историю, поэтому случайно выбранный сценарий
+   * не съедает работу: Ctrl+Z возвращает её. При первом запуске (fresh) истории нет.
+   */
+  load(doc: LoadlineDocument, opts: { fresh?: boolean; note?: string } = {}): void {
+    const prev = this.doc();
+    if (opts.fresh || !prev) this.history.clear();
+    else this.history.record(prev);
     this.selection.set(NO_SELECTION);
     this.backlog.set({});
     this.spikeUntil.set(-1);
     this.prevStatus = null;
     this.sim.doc.set(doc);
     this.log.set([]);
-    this.push('info', `Загружена схема «${doc.meta?.title ?? 'без названия'}»`);
+    const title = doc.meta?.title ?? 'без названия';
+    const undo = !opts.fresh && prev ? ' · Ctrl+Z вернёт прежнюю' : '';
+    this.push('info', `${opts.note ?? 'Загружена схема'} «${title}»${undo}`);
     this.loadCount.update((n) => n + 1);
+  }
+
+  setTitle(title: string): void {
+    const t = title.trim().slice(0, DOCUMENT_LIMITS.title);
+    this.apply(
+      (d) => (t === (d.meta?.title ?? '') ? d : { ...d, meta: { ...d.meta, title: t } }),
+      'title',
+    );
   }
 
   togglePlay(): void {

@@ -21,6 +21,9 @@
   <label class="field">
     <span>Сценарий</span>
     <select (change)="loadScenario($any($event.target).value)">
+      @if (scenarioFile() === '') {
+        <option value="" selected disabled>Своя схема</option>
+      }
       @for (s of spec.scenarios; track s.file) {
         <option [value]="s.file" [selected]="s.file === scenarioFile()">{{ s.title }}</option>
       }
@@ -112,6 +115,73 @@
   <div class="tools">
     <button
       type="button"
+      class="btn"
+      (click)="fileInput.click()"
+      title="Открыть файл .loadline.json (или перетащите его на доску)"
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 14 14"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M7 9V1.5M4 4.5l3-3 3 3M1.5 9.5v3h11v-3" />
+      </svg>
+      Открыть
+    </button>
+    <input
+      #fileInput
+      type="file"
+      accept=".json,application/json"
+      hidden
+      (change)="importFile($any($event.target).files[0]); fileInput.value = ''"
+    />
+    <button
+      type="button"
+      class="btn"
+      (click)="exportFile()"
+      title="Сохранить схему файлом .loadline.json"
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 14 14"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M7 1.5V9M4 6l3 3 3-3M1.5 9.5v3h11v-3" />
+      </svg>
+      Файл
+    </button>
+    <button type="button" class="btn" (click)="shareLink()" title="Ссылка на схему">
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 14 14"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        aria-hidden="true"
+      >
+        <path
+          d="M6 8a2.5 2.5 0 0 0 3.5 0l2-2a2.5 2.5 0 0 0-3.5-3.5l-.6.6M8 6a2.5 2.5 0 0 0-3.5 0l-2 2A2.5 2.5 0 0 0 6 11.5l.6-.6"
+        />
+      </svg>
+      Ссылка
+    </button>
+    <span class="sep" aria-hidden="true"></span>
+    <button
+      type="button"
       class="btn icon"
       [disabled]="!store.history.canUndo()"
       (click)="store.undo()"
@@ -146,7 +216,7 @@
   <ll-palette [presets]="sim.presets()" (add)="store.requestAdd($event)" />
 
   <section class="center">
-    <div class="board">
+    <div class="board" (dragover)="onFileDragOver($event)" (drop)="onFileDrop($event)">
       @defer (on immediate) {
         <ll-board
           [doc]="store.doc()"
@@ -174,3 +244,5 @@
 
   <ll-inspector />
 </main>
+
+<ll-share-dialog [state]="share()" (closed)="share.set({ status: 'closed' })" />

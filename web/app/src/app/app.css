@@ -234,3 +234,9 @@ select {
     width: 110px;
   }
 }
+
+.sep {
+  width: 1px;
+  margin: 4px 4px;
+  background: var(--ll-border);
+}
