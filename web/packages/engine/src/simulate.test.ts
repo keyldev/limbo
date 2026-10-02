@@ -116,6 +116,74 @@ describe('свойства модели', () => {
   });
 });
 
+describe('маршрутизация потока', () => {
+  const opts = { presets, samples: 4000, seed: 5 };
+  const doc = (nodes: LoadlineDocument['nodes'], edges: [string, string][], rps = 1000): LoadlineDocument => ({
+    format: 'loadline',
+    version: 1,
+    traffic: { rps, readShare: 1 },
+    nodes,
+    edges: edges.map(([from, to], i) => ({ id: `e${i}`, from: `${from}:out`, to: `${to}:in` })),
+  });
+  const at = (id: string, kind: LoadlineDocument['nodes'][number]['kind'], replicas = 1) => ({
+    id,
+    kind,
+    pos: { x: 0, y: 0 },
+    params: { replicas },
+  });
+
+  it('балансировщик делит поток поровну между сервисами', () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 1, max: 20_000 }), fc.integer({ min: 1, max: 6 }), (rps, backends) => {
+        const ids = Array.from({ length: backends }, (_, i) => `s${i}`);
+        const r = simulate(
+          doc(
+            [at('c', 'client'), at('lb', 'load-balancer', 4), ...ids.map((id) => at(id, 'service', 50))],
+            [['c', 'lb'], ...ids.map((id): [string, string] => ['lb', id])],
+            rps,
+          ),
+          opts,
+        );
+        return ids.every((id) => Math.abs(r.nodes[id]!.lambda - rps / backends) < 1e-6);
+      }),
+      { numRuns: 40 },
+    );
+  });
+
+  it('клиент с двумя связями делит трафик, сервис зовёт все зависимости', () => {
+    const r = simulate(
+      doc(
+        [at('c', 'client'), at('a', 'service', 10), at('b', 'service', 10), at('x', 'nosql'), at('y', 'search')],
+        [['c', 'a'], ['c', 'b'], ['a', 'x'], ['a', 'y']],
+      ),
+      opts,
+    );
+    expect(r.nodes['a']!.lambda).toBeCloseTo(500);
+    expect(r.nodes['b']!.lambda).toBeCloseTo(500);
+    expect(r.nodes['x']!.lambda).toBeCloseTo(500);
+    expect(r.nodes['y']!.lambda).toBeCloseTo(500);
+    expect(r.edges['e0']!.rps).toBeCloseTo(500);
+  });
+
+  it('медленный потребитель за очередью копит backlog, но не даёт ошибок клиенту', () => {
+    const r = simulate(
+      doc([at('c', 'client'), at('q', 'queue'), at('w', 'worker', 1)], [['c', 'q'], ['q', 'w']], 500),
+      opts,
+    );
+    const worker = r.nodes['w']!;
+    expect(worker.status).toBe('over');
+    expect(worker.behindQueue).toBe(true);
+    expect(r.nodes['q']!.backlogRps).toBeCloseTo(500 - 300);
+    expect(r.system.errorRate).toBe(0);
+  });
+
+  it('узел без трафика — idle и не узкое место', () => {
+    const r = simulate(doc([at('c', 'client'), at('a', 'service'), at('lonely', 'nosql')], [['c', 'a']]), opts);
+    expect(r.nodes['lonely']!.status).toBe('idle');
+    expect(r.system.bottleneckId).toBe('a');
+  });
+});
+
 describe('миграции формата', () => {
   it('отклоняет чужие и будущие файлы', () => {
     expect(() => migrate({ format: 'drawio' })).toThrow();

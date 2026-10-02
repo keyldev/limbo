@@ -1,0 +1,29 @@
+{
+  "format": "loadline",
+  "version": 1,
+  "meta": {
+    "title": "Телеметрия",
+    "description": "Эталонный сценарий: датчики пишут через шлюз, валидатор кладёт данные в очередь, два набора воркеров разбирают её независимо. Индексатор нарочно не успевает: за очередью копится backlog, а датчики этого не видят.",
+    "createdAt": "2026-10-02T12:00:00Z"
+  },
+  "traffic": { "rps": 3000, "readShare": 0, "spike": 1 },
+  "nodes": [
+    { "id": "c", "kind": "client", "label": "Датчики", "preset": "client.default", "pos": { "x": 0, "y": 204 } },
+    { "id": "gw", "kind": "api-gateway", "label": "ingest-gw", "preset": "gateway.default", "pos": { "x": 240, "y": 204 } },
+    { "id": "val", "kind": "service", "label": "validate", "preset": "service.small", "pos": { "x": 480, "y": 204 }, "params": { "replicas": 4 } },
+    { "id": "q", "kind": "queue", "label": "telemetry", "preset": "queue.default", "pos": { "x": 720, "y": 204 } },
+    { "id": "agg", "kind": "worker", "label": "aggregator", "preset": "worker.small", "pos": { "x": 960, "y": 96 }, "params": { "replicas": 12 } },
+    { "id": "ts", "kind": "nosql", "label": "timeseries", "preset": "nosql.default", "pos": { "x": 1200, "y": 96 } },
+    { "id": "ix", "kind": "worker", "label": "indexer", "preset": "worker.small", "pos": { "x": 960, "y": 312 }, "params": { "replicas": 6 } },
+    { "id": "es", "kind": "search", "label": "logs-index", "preset": "search.default", "pos": { "x": 1200, "y": 312 } }
+  ],
+  "edges": [
+    { "id": "e1", "from": "c:out", "to": "gw:in" },
+    { "id": "e2", "from": "gw:out", "to": "val:in" },
+    { "id": "e3", "from": "val:out", "to": "q:in" },
+    { "id": "e4", "from": "q:out", "to": "agg:in" },
+    { "id": "e5", "from": "agg:out", "to": "ts:in" },
+    { "id": "e6", "from": "q:out", "to": "ix:in" },
+    { "id": "e7", "from": "ix:out", "to": "es:in" }
+  ]
+}

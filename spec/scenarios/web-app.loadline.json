@@ -1,0 +1,35 @@
+{
+  "format": "loadline",
+  "version": 1,
+  "meta": {
+    "title": "Веб-приложение",
+    "description": "Эталонный сценарий: CDN и балансировщик делят поток между двумя копиями API. Оба API читают через общий кэш и пишут события в очередь, воркер за очередью кладёт файлы в объектное хранилище.",
+    "createdAt": "2026-10-02T12:00:00Z"
+  },
+  "traffic": { "rps": 1500, "readShare": 0.8, "spike": 1 },
+  "nodes": [
+    { "id": "c", "kind": "client", "label": "Веб и мобильные", "preset": "client.default", "pos": { "x": 0, "y": 204 } },
+    { "id": "cdn", "kind": "cdn", "label": "edge-cdn", "preset": "cdn.default", "pos": { "x": 240, "y": 204 }, "params": { "hitRatio": 0.55 } },
+    { "id": "lb", "kind": "load-balancer", "label": "public-lb", "preset": "lb.default", "pos": { "x": 480, "y": 204 } },
+    { "id": "a", "kind": "service", "label": "api-a", "preset": "service.small", "pos": { "x": 720, "y": 96 } },
+    { "id": "b", "kind": "service", "label": "api-b", "preset": "service.small", "pos": { "x": 720, "y": 312 } },
+    { "id": "rc", "kind": "cache", "label": "hot-cache", "preset": "cache.redis-small", "pos": { "x": 960, "y": 96 } },
+    { "id": "db", "kind": "sql-primary", "label": "orders-db", "preset": "sql.primary-medium", "pos": { "x": 1200, "y": 96 } },
+    { "id": "q", "kind": "queue", "label": "events", "preset": "queue.default", "pos": { "x": 960, "y": 312 } },
+    { "id": "w", "kind": "worker", "label": "thumbnailer", "preset": "worker.small", "pos": { "x": 1200, "y": 312 }, "params": { "replicas": 2 } },
+    { "id": "s3", "kind": "object-storage", "label": "media-bucket", "preset": "storage.object", "pos": { "x": 1440, "y": 312 } }
+  ],
+  "edges": [
+    { "id": "e1", "from": "c:out", "to": "cdn:in" },
+    { "id": "e2", "from": "cdn:out", "to": "lb:in" },
+    { "id": "e3", "from": "lb:out", "to": "a:in" },
+    { "id": "e4", "from": "lb:out", "to": "b:in" },
+    { "id": "e5", "from": "a:out", "to": "rc:in" },
+    { "id": "e6", "from": "b:out", "to": "rc:in" },
+    { "id": "e7", "from": "rc:out", "to": "db:in" },
+    { "id": "e8", "from": "a:out", "to": "q:in", "mode": "parallel" },
+    { "id": "e9", "from": "b:out", "to": "q:in", "mode": "parallel" },
+    { "id": "e10", "from": "q:out", "to": "w:in" },
+    { "id": "e11", "from": "w:out", "to": "s3:in" }
+  ]
+}

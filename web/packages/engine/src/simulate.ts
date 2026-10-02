@@ -14,7 +14,19 @@ export interface ResolvedNode {
   outage: boolean;
 }
 
-export type LoadStatus = 'ok' | 'warm' | 'hot' | 'down';
+/**
+ * Состояние узла для интерфейса: idle — трафик не доходит, warm — ρ ≥ 0,7 (задержка растёт),
+ * hot — ρ ≥ 0,9, over — ρ ≥ 1 (лишнее уходит в ошибки или в backlog очереди), down — отказ.
+ */
+export type LoadStatus = 'idle' | 'ok' | 'warm' | 'hot' | 'over' | 'down';
+
+/**
+ * Как узел передаёт запрос дальше по исходящим связям:
+ * - split — каждый запрос уходит в одну связь, поток делится поровну (клиент, балансировщик, CDN, шлюз, кэш);
+ * - fanout — каждый запрос зовёт все связи (сервисы, воркеры, хранилища);
+ * - async — очередь: каждый потребитель получает все сообщения, отправитель не ждёт.
+ */
+export type Routing = 'split' | 'fanout' | 'async';
 
 export interface NodeMetrics {
   id: string;
@@ -25,18 +37,30 @@ export interface NodeMetrics {
   writeRps: number;
   /** ρ — загрузка. Может быть больше 1 при перегрузе. */
   rho: number;
+  /** c · μ — ёмкость узла, rps. 0 при отказе. */
+  capacityRps: number;
   /** Обслужено, rps. */
   servedRps: number;
-  /** Отказано из-за перегруза или отказа узла, rps. */
+  /** Отказано из-за перегруза или отказа узла, rps. За очередью это отставание, а не ошибки. */
   droppedRps: number;
-  /** Накопление за очередью, rps (только для queue). */
+  /** С какой скоростью растёт backlog очереди: сообщения, которые потребители не успевают взять, rps. */
   backlogRps: number;
+  /** С какой скоростью потребители могут разбирать накопленный backlog, rps (только для queue). */
+  drainRps: number;
+  /** Узел получает трафик только из очередей: его перегруз — отставание, а не ошибки клиента. */
+  behindQueue: boolean;
   /** W — среднее время ответа узла, мс. */
   meanLatencyMs: number;
   p95Ms: number;
   p99Ms: number;
   costMonthlyUsd: number;
   status: LoadStatus;
+}
+
+export interface EdgeMetrics {
+  id: string;
+  /** Поток по связи, rps. */
+  rps: number;
 }
 
 export interface SystemMetrics {
@@ -49,12 +73,13 @@ export interface SystemMetrics {
   p95Ms: number;
   p99Ms: number;
   costMonthlyUsd: number;
-  /** Узел с наибольшей загрузкой. */
+  /** Узел с наибольшей загрузкой среди тех, до кого доходит трафик. */
   bottleneckId: string | null;
 }
 
 export interface SimulationResult {
   nodes: Record<string, NodeMetrics>;
+  edges: Record<string, EdgeMetrics>;
   system: SystemMetrics;
   /** Предупреждения модели: циклы, висящие связи, неизвестные пресеты. */
   warnings: string[];
@@ -72,6 +97,24 @@ export interface SimulateOptions {
 const CACHING_KINDS: ReadonlySet<NodeKind> = new Set<NodeKind>(['cache', 'cdn']);
 /** Компоненты, после которых клиент не ждёт обработки ниже по графу. */
 const ASYNC_KINDS: ReadonlySet<NodeKind> = new Set<NodeKind>(['queue']);
+/** Компоненты, которые отправляют каждый запрос в одну из связей. */
+const SPLIT_KINDS: ReadonlySet<NodeKind> = new Set<NodeKind>([
+  'client',
+  'load-balancer',
+  'cdn',
+  'api-gateway',
+  'cache',
+]);
+
+export function routingOf(kind: NodeKind): Routing {
+  if (ASYNC_KINDS.has(kind)) return 'async';
+  return SPLIT_KINDS.has(kind) ? 'split' : 'fanout';
+}
+
+/** Сколько потока уходит в каждую исходящую связь: при split поток делится, иначе копируется. */
+function shareOf(routing: Routing, outCount: number): number {
+  return routing === 'split' && outCount > 0 ? 1 / outCount : 1;
+}
 
 const STATUS_WARM = 0.7;
 const STATUS_HOT = 0.9;
@@ -105,7 +148,8 @@ export function resolveNode(node: DiagramNode, presets: readonly Preset[], warni
 interface Graph {
   nodes: Map<string, ResolvedNode>;
   out: Map<string, Edge[]>;
-  inDegree: Map<string, number>;
+  /** Откуда приходят связи: id узлов-источников. */
+  inbound: Map<string, string[]>;
   order: string[];
   entries: string[];
 }
@@ -115,10 +159,10 @@ function buildGraph(doc: LoadlineDocument, presets: readonly Preset[], warnings:
   for (const n of doc.nodes) nodes.set(n.id, resolveNode(n, presets, warnings));
 
   const out = new Map<string, Edge[]>();
-  const inDegree = new Map<string, number>();
+  const inbound = new Map<string, string[]>();
   for (const id of nodes.keys()) {
     out.set(id, []);
-    inDegree.set(id, 0);
+    inbound.set(id, []);
   }
   for (const e of doc.edges) {
     const from = nodeIdOf(e.from);
@@ -128,15 +172,16 @@ function buildGraph(doc: LoadlineDocument, presets: readonly Preset[], warnings:
       continue;
     }
     out.get(from)!.push(e);
-    inDegree.set(to, (inDegree.get(to) ?? 0) + 1);
+    inbound.get(to)!.push(from);
   }
 
   // Входы: явные клиенты, иначе узлы без входящих связей.
   const clients = [...nodes.values()].filter((n) => n.kind === 'client').map((n) => n.id);
-  const entries = clients.length > 0 ? clients : [...nodes.keys()].filter((id) => inDegree.get(id) === 0);
+  const entries =
+    clients.length > 0 ? clients : [...nodes.keys()].filter((id) => inbound.get(id)!.length === 0);
 
   // Топологический порядок (Кан). Узлы в циклах в порядок не попадут.
-  const deg = new Map(inDegree);
+  const deg = new Map([...inbound].map(([id, from]) => [id, from.length]));
   const queue = [...nodes.keys()].filter((id) => deg.get(id) === 0);
   const order: string[] = [];
   while (queue.length > 0) {
@@ -153,11 +198,13 @@ function buildGraph(doc: LoadlineDocument, presets: readonly Preset[], warnings:
     warnings.push('В схеме есть цикл: узлы в цикле не считаются');
   }
 
-  return { nodes, out, inDegree, order, entries };
+  return { nodes, out, inbound, order, entries };
 }
 
-function statusOf(rho: number, outage: boolean): LoadStatus {
-  if (outage) return 'down';
+function statusOf(n: ResolvedNode, lambda: number, rho: number): LoadStatus {
+  if (n.outage) return 'down';
+  if (lambda < 1e-9 && n.kind !== 'client') return 'idle';
+  if (rho >= 1) return 'over';
   if (rho >= STATUS_HOT) return 'hot';
   if (rho >= STATUS_WARM) return 'warm';
   return 'ok';
@@ -165,9 +212,12 @@ function statusOf(rho: number, outage: boolean): LoadStatus {
 
 /**
  * Аналитический проход: потоки по графу, загрузка, средние и перцентили каждого узла.
- * Сервис зовёт каждую исходящую зависимость с полным обслуженным потоком.
+ * Как поток идёт дальше, решает routingOf(kind): split делит его между связями, fanout и async копируют.
  */
-function analyze(doc: LoadlineDocument, g: Graph): Record<string, NodeMetrics> {
+function analyze(
+  doc: LoadlineDocument,
+  g: Graph,
+): { nodes: Record<string, NodeMetrics>; edges: Record<string, EdgeMetrics> } {
   const spike = doc.traffic.spike ?? 1;
   const readShare = doc.traffic.readShare ?? 1;
   const incoming = doc.traffic.rps * spike;
@@ -184,7 +234,8 @@ function analyze(doc: LoadlineDocument, g: Graph): Record<string, NodeMetrics> {
     writes.set(id, perEntry * (1 - readShare));
   }
 
-  const result: Record<string, NodeMetrics> = {};
+  const nodes: Record<string, NodeMetrics> = {};
+  const edges: Record<string, EdgeMetrics> = {};
   for (const id of g.order) {
     const n = g.nodes.get(id)!;
     const r = reads.get(id) ?? 0;
@@ -193,63 +244,62 @@ function analyze(doc: LoadlineDocument, g: Graph): Record<string, NodeMetrics> {
 
     const capacity = n.outage ? 0 : n.replicas * n.capacityRps;
     const rho = n.outage ? (lambda > 0 ? Infinity : 0) : utilization(lambda, n.replicas, n.capacityRps);
-    const isQueue = ASYNC_KINDS.has(n.kind);
 
-    // Лишний поток сверх c·μ уходит в ошибки. Очередь тоже: она отказывает,
-    // когда не успевает записывать, а вот медленные потребители копят backlog.
+    // Лишний поток сверх c·μ уходит в ошибки (за очередью — в отставание, см. backlog ниже).
     const served = Math.min(lambda, capacity);
     const dropped = lambda - served;
-    let backlog = 0;
 
     const share = lambda > 0 ? served / lambda : 0;
     let downR = r * share;
     const downW = w * share;
     if (CACHING_KINDS.has(n.kind)) downR *= 1 - n.hitRatio;
 
-    // За очередью: если потребители не успевают, разница копится в backlog.
-    if (isQueue) {
-      const consumers = (g.out.get(id) ?? []).map((e) => g.nodes.get(nodeIdOf(e.to))!);
-      const consumerCap = consumers.reduce(
-        (s, c) => s + (c.outage ? 0 : c.replicas * c.capacityRps),
-        0,
-      );
-      const outFlow = downR + downW;
-      if (consumers.length > 0 && outFlow > consumerCap) {
-        backlog = outFlow - consumerCap;
-      }
-    }
-
-    for (const e of g.out.get(id) ?? []) {
+    const outs = g.out.get(id) ?? [];
+    const k = shareOf(routingOf(n.kind), outs.length);
+    for (const e of outs) {
       const to = nodeIdOf(e.to);
-      let rr = downR;
-      let ww = downW;
-      if (isQueue && backlog > 0) {
-        const k = (downR + downW - backlog) / (downR + downW);
-        rr *= k;
-        ww *= k;
-      }
-      reads.set(to, (reads.get(to) ?? 0) + rr);
-      writes.set(to, (writes.get(to) ?? 0) + ww);
+      reads.set(to, (reads.get(to) ?? 0) + downR * k);
+      writes.set(to, (writes.get(to) ?? 0) + downW * k);
+      edges[e.id] = { id: e.id, rps: (downR + downW) * k };
     }
 
+    const from = g.inbound.get(id)!;
     const W = n.outage ? 0 : meanLatency(n.baseLatencyMs, rho);
-    result[id] = {
+    nodes[id] = {
       id,
       lambda,
       readRps: r,
       writeRps: w,
       rho,
+      capacityRps: capacity,
       servedRps: served,
       droppedRps: dropped,
-      backlogRps: backlog,
+      backlogRps: 0,
+      drainRps: 0,
+      behindQueue: from.length > 0 && from.every((f) => ASYNC_KINDS.has(g.nodes.get(f)!.kind)),
       meanLatencyMs: W,
       p95Ms: latencyPercentile(W, 0.95),
       p99Ms: latencyPercentile(W, 0.99),
       costMonthlyUsd: n.replicas * n.costPerReplicaUsd,
-      status: statusOf(rho, n.outage),
+      status: statusOf(n, lambda, rho),
     };
   }
-  return result;
+
+  // Очереди: потребитель, который не успевает, не роняет запросы клиента, а копит backlog.
+  // Растёт он на недообслуженную долю потока каждой связи, разбирается запасом ёмкости потребителей.
+  for (const id of g.order) {
+    const q = nodes[id]!;
+    if (!ASYNC_KINDS.has(g.nodes.get(id)!.kind)) continue;
+    for (const e of g.out.get(id) ?? []) {
+      const c = nodes[nodeIdOf(e.to)];
+      if (!c) continue;
+      const ok = c.lambda > 0 ? c.servedRps / c.lambda : 1;
+      q.backlogRps += (edges[e.id]?.rps ?? 0) * (1 - ok);
+      q.drainRps += Math.max(0, c.capacityRps - c.lambda);
+    }
+  }
+
+  return { nodes, edges };
 }
 
 /**
@@ -273,9 +323,20 @@ function sampleRequest(
   let t = sampleExp(rng, m.meanLatencyMs);
 
   if (CACHING_KINDS.has(n.kind) && isRead && rng() < n.hitRatio) return t;
-  if (ASYNC_KINDS.has(n.kind)) return t;
+  const routing = routingOf(n.kind);
+  if (routing === 'async') return t;
 
   const edges = g.out.get(id) ?? [];
+  if (edges.length === 0) return t;
+
+  // split: запрос уходит ровно в одну связь, выбранную равновероятно.
+  // При одной связи выбирать нечего: не тратим случайное число, чтобы не сдвигать поток сэмплов.
+  if (routing === 'split') {
+    const e = edges.length === 1 ? edges[0]! : edges[Math.floor(rng() * edges.length)]!;
+    const child = sampleRequest(nodeIdOf(e.to), isRead, g, metrics, rng, depth + 1);
+    return child === null ? null : t + child;
+  }
+
   let parallelMax = 0;
   for (const e of edges) {
     const child = sampleRequest(nodeIdOf(e.to), isRead, g, metrics, rng, depth + 1);
@@ -289,7 +350,7 @@ function sampleRequest(
 export function simulate(doc: LoadlineDocument, options: SimulateOptions): SimulationResult {
   const warnings: string[] = [];
   const g = buildGraph(doc, options.presets, warnings);
-  const nodes = analyze(doc, g);
+  const { nodes, edges } = analyze(doc, g);
 
   const samples = options.samples ?? 20_000;
   const rng = createRng(options.seed ?? 1);
@@ -315,7 +376,7 @@ export function simulate(doc: LoadlineDocument, options: SimulateOptions): Simul
   let bottleneckId: string | null = null;
   let maxRho = -1;
   for (const m of Object.values(nodes)) {
-    if (g.nodes.get(m.id)?.kind === 'client') continue;
+    if (g.nodes.get(m.id)?.kind === 'client' || m.lambda <= 0) continue;
     if (m.rho > maxRho) {
       maxRho = m.rho;
       bottleneckId = m.id;
@@ -324,6 +385,7 @@ export function simulate(doc: LoadlineDocument, options: SimulateOptions): Simul
 
   return {
     nodes,
+    edges,
     warnings,
     system: {
       incomingRps: incoming,
