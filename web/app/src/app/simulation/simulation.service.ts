@@ -17,6 +17,8 @@ export class SimulationService {
   readonly result = signal<SimulationResult | null>(null);
   readonly error = signal<string | null>(null);
   readonly busy = signal(false);
+  /** Временный множитель трафика (кнопка Spike). В документ не пишется. */
+  readonly spike = signal(1);
 
   private readonly worker: Worker | null = this.createWorker();
   private lastId = 0;
@@ -33,7 +35,13 @@ export class SimulationService {
     effect(() => {
       const doc = this.doc();
       const presets = this.presets();
-      if (doc && presets.length > 0) this.schedule(doc, presets);
+      const spike = this.spike();
+      if (!doc || presets.length === 0) return;
+      const effective =
+        spike === 1
+          ? doc
+          : { ...doc, traffic: { ...doc.traffic, spike: (doc.traffic.spike ?? 1) * spike } };
+      this.schedule(effective, presets);
     });
 
     inject(DestroyRef).onDestroy(() => this.worker?.terminate());

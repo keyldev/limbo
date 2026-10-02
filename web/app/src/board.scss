@@ -1,12 +1,12 @@
 /*
- * Общие стили досок-прототипов (ADR 0003). Глобальные, потому что обе библиотеки
- * рисуют узлы и связи вне инкапсуляции компонента.
- * Цвета только из токенов --ll-*: тема Loadline переключает обе доски сразу.
+ * Стили доски на Foblex Flow. Глобальные: Foblex рисует узлы и связи
+ * вне инкапсуляции компонента. Цвета только из токенов --ll-*, поэтому тема
+ * переключает доску вместе со всем приложением.
  */
 
 @use '@foblex/flow/styles' as flow;
 
-/* ---------- Foblex Flow: каркас и связи из темы библиотеки, цвета наши ---------- */
+/* ---------- каркас и связи из темы Foblex, цвета наши ---------- */
 
 :root {
   @include flow.theme-tokens();
@@ -18,12 +18,12 @@ f-flow {
   --ff-flow-text-color: var(--ll-text);
   --ff-flow-font-family: var(--ll-font);
   --ff-background-dot-color: var(--ll-border);
-  --ff-connection-color: var(--ll-text-muted);
+  --ff-connection-color: var(--ll-wire);
   --ff-connection-width: 1.5px;
   --ff-connection-hit-width: 14px;
-  --ff-connection-hover-color: color-mix(in srgb, var(--ll-accent) 25%, transparent);
+  --ff-connection-hover-color: color-mix(in srgb, var(--ll-accent) 22%, transparent);
   --ff-connection-selected-color: var(--ll-accent);
-  --ff-marker-color: var(--ll-text-muted);
+  --ff-marker-color: var(--ll-wire);
   --ff-snap-connection-color: var(--ll-accent);
   --ff-selection-area-color: color-mix(in srgb, var(--ll-accent) 12%, transparent);
   --ff-selection-area-border-color: var(--ll-accent);
@@ -34,87 +34,153 @@ f-flow {
 @include flow.connection-all();
 @include flow.plugins();
 
-f-flow .f-connection.parallel .f-connection-path {
-  stroke-dasharray: 5 4;
+/* ---------- связи ---------- */
+
+.ll-wire .f-connection-path {
+  stroke-width: var(--ll-w, 1.5px);
+  transition: stroke 0.25s;
 }
 
-/* ---------- Узел и порты: одинаковые в обоих прототипах ---------- */
+/* Связь без потока — пунктир: видно, что до неё трафик не доходит. */
+.ll-wire.dry .f-connection-path {
+  stroke-dasharray: 4 5;
+}
+
+.ll-wire.parallel:not(.dry) .f-connection-path {
+  stroke-dasharray: 10 3;
+}
+
+.ll-wire:is([data-status='over'], [data-status='down']):not(.f-selected) .f-connection-path {
+  stroke: var(--ll-hot);
+}
+
+.ll-wire:is([data-status='over'], [data-status='down']):not(.f-selected) .f-marker {
+  color: var(--ll-hot);
+}
+
+/* Бегущие точки-запросы: пунктир из точек, который сдвигается вдоль пути (см. flow-dots.ts). */
+.ll-flow {
+  fill: none;
+  stroke: var(--ll-accent);
+  stroke-width: 6px;
+  stroke-linecap: round;
+  pointer-events: none;
+  animation: ll-flow linear infinite;
+}
+
+.ll-wire[data-status='warm'] .ll-flow {
+  stroke: var(--ll-warm);
+}
+
+.ll-wire:is([data-status='hot'], [data-status='over'], [data-status='down']) .ll-flow {
+  stroke: var(--ll-hot);
+}
+
+@keyframes ll-flow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: calc(-1 * var(--ll-gap, 40px));
+  }
+}
+
+.paused .ll-flow {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ll-flow {
+    display: none;
+  }
+}
+
+.ll-elabel {
+  padding: 1px 6px;
+  border: 1px solid var(--ll-border);
+  border-radius: 4px;
+  background: var(--ll-surface);
+  color: var(--ll-text-muted);
+  font: 500 10.5px/1.4 var(--ll-mono);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ---------- узел ---------- */
 
 .ll-node-host {
   position: relative;
-  width: 140px;
-  height: 56px;
+  width: 188px;
+  height: 78px;
   cursor: grab;
 }
 
-.ll-node-host > ll-node-card {
-  transition: border-color 120ms;
-}
-
-.ll-node-host.f-selected > ll-node-card,
-.ll-node-host.selected > ll-node-card {
-  border-color: var(--ll-accent);
-  box-shadow: 0 0 0 1px var(--ll-accent);
-}
-
-.f-dragging .ll-node-host,
-.ll-node-host.f-dragging {
+.ll-node-host.f-dragging,
+f-flow.f-dragging .ll-node-host {
   cursor: grabbing;
 }
 
-/* Порт-ромб: квадрат 10×10, повёрнутый на 45°, по центру боковой грани. */
+/* Прицельная рамка вокруг выделенного узла: четыре уголка акцентным цветом. */
+.ll-node-host.f-selected::before {
+  --c: var(--ll-accent);
+  --l: 14px;
+  --w: 2px;
+  content: '';
+  position: absolute;
+  inset: -7px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--c), var(--c)) left top / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) left top / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) right top / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) right top / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) left bottom / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) left bottom / var(--w) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) right bottom / var(--l) var(--w) no-repeat,
+    linear-gradient(var(--c), var(--c)) right bottom / var(--w) var(--l) no-repeat;
+}
+
+.ll-node-host.f-selected > ll-node-card {
+  border-color: var(--ll-accent);
+}
+
+/* Порт-ромб: квадрат, повёрнутый на 45°, по центру боковой грани. */
 .ll-port {
   position: absolute;
   top: 50%;
-  width: 10px;
-  height: 10px;
-  margin-top: -5px;
-  transform: rotate(45deg);
-  background: var(--ll-surface);
-  border: 1.5px solid var(--ll-text-muted);
   z-index: 1;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  transform: rotate(45deg);
+  border: 2px solid var(--ll-wire);
+  background: var(--ll-surface);
   cursor: crosshair;
 }
 
 .ll-port.in {
-  left: -6px;
+  left: -7px;
 }
 
 .ll-port.out {
-  right: -6px;
+  right: -7px;
+}
+
+/* Невидимая зона вокруг выхода: в мелкий ромб легко промахнуться. */
+.ll-port.out::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
 }
 
 .ll-port:hover,
-.ll-port.f-connector-connectable {
+.ll-port.f-connector-connectable,
+f-flow.f-connections-dragging .ll-port.in {
   border-color: var(--ll-accent);
-  background: var(--ll-accent);
+  background: color-mix(in srgb, var(--ll-accent) 25%, var(--ll-surface));
 }
 
-/* ---------- ngx-vflow ---------- */
-
-.ll-port-svg {
-  fill: var(--ll-surface);
-  stroke: var(--ll-text-muted);
-  stroke-width: 1.5;
-  cursor: crosshair;
-}
-
-.ll-port-svg:hover {
-  fill: var(--ll-accent);
-  stroke: var(--ll-accent);
-}
-
-vflow .edge {
-  stroke: var(--ll-text-muted);
-  stroke-width: 1.5;
-}
-
-vflow .edge_selected,
-vflow .edge.selected {
-  stroke: var(--ll-accent);
-}
-
-/* Цвет точек фона vflow задаёт SVG-атрибутом, а var() в атрибутах не работает: перекрываем CSS. */
-vflow pattern circle {
+/* Точки фона: Foblex задаёт цвет атрибутом, где var() не работает, поэтому перекрываем CSS. */
+f-background pattern circle {
   fill: var(--ll-border);
 }

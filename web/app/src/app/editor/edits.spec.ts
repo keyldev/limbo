@@ -1,5 +1,15 @@
 import type { LoadlineDocument } from '@loadline/model';
-import { addEdge, moveNodes, reconnectEdge, removeEdge, removeNode } from './edits';
+import {
+  addEdge,
+  addNode,
+  connectProblem,
+  moveNodes,
+  reconnectEdge,
+  removeEdge,
+  removeNode,
+  setEdgeMode,
+  updateNode,
+} from './edits';
 import { History } from './history';
 
 const doc: LoadlineDocument = {
@@ -55,7 +65,54 @@ describe('правки схемы', () => {
   });
 });
 
+describe('правила связей и новые узлы', () => {
+  it('связь в клиента и связь, замыкающая цикл, запрещены с объяснением', () => {
+    const chain = addEdge(doc, { from: 'b:out', to: 'c:in' });
+    expect(connectProblem(chain, { from: 'b:out', to: 'a:in' })).toMatch(/клиент/);
+    expect(connectProblem(chain, { from: 'c:out', to: 'b:in' })).toMatch(/цикл/);
+    expect(addEdge(chain, { from: 'c:out', to: 'b:in' })).toBe(chain);
+  });
+
+  it('переподключение не считает циклом саму переносимую связь', () => {
+    expect(reconnectEdge(doc, { edgeId: 'e1', from: 'a:out', to: 'c:in' })).not.toBe(doc);
+  });
+
+  it('новый узел получает свободное имя и пресет своего типа', () => {
+    const one = addNode(doc, 'service', { x: 10, y: 20 });
+    const two = addNode(one.doc, 'service', { x: 0, y: 0 });
+    expect(one.node).toMatchObject({
+      id: 'service',
+      label: 'service',
+      preset: 'service.small',
+      pos: { x: 10, y: 20 },
+    });
+    expect(two.node.id).toBe('service-2');
+  });
+
+  it('правка параметров сливается с прежними, пустая правка не создаёт документ', () => {
+    const r = updateNode(doc, 'b', { params: { replicas: 3 } });
+    const both = updateNode(r, 'b', { params: { outage: true }, label: 'api' });
+    expect(both.nodes[1]).toMatchObject({ label: 'api', params: { replicas: 3, outage: true } });
+    expect(updateNode(r, 'b', { params: { replicas: 3 } })).toBe(r);
+  });
+
+  it('режим вызова связи', () => {
+    const p = setEdgeMode(doc, 'e1', 'parallel');
+    expect(p.edges[0]!.mode).toBe('parallel');
+    expect(setEdgeMode(p, 'e1', 'parallel')).toBe(p);
+  });
+});
+
 describe('история', () => {
+  it('правки с одним ключом подряд склеиваются в один шаг', () => {
+    const h = new History<string>();
+    h.record('a', 'name', 0);
+    h.record('ab', 'name', 300);
+    h.record('abc', 'name', 600);
+    expect(h.undo('abcd')).toBe('a');
+    expect(h.canUndo()).toBe(false);
+  });
+
   it('отменяет и повторяет по шагам, новая правка сбрасывает повтор', () => {
     const h = new History<number>();
     h.record(1);

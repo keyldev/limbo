@@ -1,12 +1,10 @@
 import type { Position } from '@loadline/model';
 
 /**
- * Общий контракт доски. Обе библиотеки-кандидата (ADR 0003) и временный SVG-предпросмотр
- * получают одни и те же входы и отдают одни и те же события, поэтому приложение не знает,
- * какая доска сейчас стоит. Порты в событиях — в формате документа: `узел:in` и `узел:out`.
+ * Контракт доски: что приложение отдаёт доске и какие события получает обратно.
+ * Приложение не знает про библиотеку доски (сейчас Foblex Flow, ADR 0003), поэтому её можно
+ * заменить, не трогая остальное. Порты в событиях — в формате документа: `узел:in` и `узел:out`.
  */
-
-export type BoardKind = 'preview' | 'foblex' | 'vflow';
 
 export interface BoardSelection {
   nodeId: string | null;
@@ -27,8 +25,11 @@ export interface BoardReconnect extends BoardConnect {
   edgeId: string;
 }
 
-export const NODE_W = 140;
-export const NODE_H = 56;
+/** MIME-тип перетаскивания компонента из палитры на доску. */
+export const PALETTE_MIME = 'application/x-loadline-kind';
+
+export const NODE_W = 188;
+export const NODE_H = 78;
 
 export const inPort = (nodeId: string): string => `${nodeId}:in`;
 export const outPort = (nodeId: string): string => `${nodeId}:out`;

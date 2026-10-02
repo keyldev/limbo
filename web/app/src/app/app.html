@@ -1,7 +1,21 @@
-<header class="topbar">
+<header class="top">
   <div class="brand">
-    <span class="logo" aria-hidden="true">◆</span>
-    <span>Loadline</span>
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      aria-hidden="true"
+    >
+      <circle cx="5" cy="12" r="2.5" />
+      <circle cx="19" cy="6" r="2.5" />
+      <circle cx="19" cy="18" r="2.5" />
+      <path d="M7.5 12c5 0 5-6 9-6M7.5 12c5 0 5 6 9 6" />
+    </svg>
+    Loadline
   </div>
 
   <label class="field">
@@ -10,125 +24,153 @@
       @for (s of spec.scenarios; track s.file) {
         <option [value]="s.file" [selected]="s.file === scenarioFile()">{{ s.title }}</option>
       }
-      <option [value]="stressScenario" [selected]="scenarioFile() === stressScenario">
-        Стресс: 200 узлов
+      <option [value]="blankScenario" [selected]="scenarioFile() === blankScenario">
+        Пустая доска
       </option>
-    </select>
-  </label>
-
-  <label class="field grow">
-    <span>Трафик</span>
-    <input
-      type="range"
-      min="0"
-      max="20000"
-      step="100"
-      [value]="rps()"
-      (input)="setRps(+$any($event.target).value)"
-    />
-    <span class="mono">{{ rps() }} rps</span>
-  </label>
-
-  <label class="field">
-    <span>Доска</span>
-    <select (change)="setBoard($any($event.target).value)">
-      @for (b of boards; track b.kind) {
-        <option [value]="b.kind" [selected]="b.kind === board()">{{ b.title }}</option>
+      @if (bench) {
+        <option [value]="stressScenario" [selected]="scenarioFile() === stressScenario">
+          Стресс: 200 узлов
+        </option>
       }
     </select>
   </label>
 
-  <div class="group" role="group" aria-label="История">
+  <div class="simctl">
     <button
       type="button"
-      class="btn ghost"
-      [disabled]="!history.canUndo()"
-      (click)="undo()"
+      class="btn primary"
+      (click)="store.togglePlay()"
+      [attr.aria-pressed]="store.playing()"
+    >
+      @if (store.playing()) {
+        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+          <rect x="2" y="1.5" width="3" height="9" fill="currentColor" />
+          <rect x="7" y="1.5" width="3" height="9" fill="currentColor" />
+        </svg>
+        Пауза
+      } @else {
+        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+          <path d="M3 1.5l7 4.5-7 4.5z" fill="currentColor" />
+        </svg>
+        Пуск
+      }
+    </button>
+    <span class="clock">t+{{ fmtClock(store.clock()) }}</span>
+    <label class="field traffic">
+      <span>Трафик</span>
+      <input
+        type="range"
+        min="0"
+        max="1000"
+        [value]="slider()"
+        (input)="setSlider(+$any($event.target).value)"
+      />
+      <b>{{ fmt(effectiveRps()) }} rps</b>
+    </label>
+    <button
+      type="button"
+      class="btn"
+      [class.spiking]="store.spiking()"
+      [disabled]="store.spiking()"
+      (click)="store.spike()"
+    >
+      {{ store.spiking() ? 'Spike ' + store.spikeLeft() + ' с' : 'Spike ×4' }}
+    </button>
+  </div>
+
+  <dl class="metrics">
+    <div>
+      <dt>Обслужено</dt>
+      <dd>{{ fmt(system()?.servedRps ?? 0) }} <small>rps</small></dd>
+    </div>
+    <div>
+      <dt>Ошибки</dt>
+      <dd [class]="'t-' + errTone()">{{ errorPct(system()?.errorRate ?? 0) }}</dd>
+    </div>
+    <div>
+      <dt>Задержка</dt>
+      <dd [class]="'t-' + latTone()">
+        {{ system()?.incomingRps ? fmtMs(system()!.meanLatencyMs) : '–' }}
+      </dd>
+    </div>
+    <div>
+      <dt>p99</dt>
+      <dd>{{ system()?.incomingRps ? fmtMs(system()!.p99Ms) : '–' }}</dd>
+    </div>
+    <div>
+      <dt>Стоимость</dt>
+      <dd>{{ money(system()?.costMonthlyUsd ?? 0) }}<small>/мес</small></dd>
+    </div>
+    <div>
+      <dt>Узкое место</dt>
+      <dd [class]="bottleneck() ? 't-' + bottleneck()!.status : ''">
+        {{ bottleneck() ? bottleneck()!.name + ' ' + bottleneck()!.text : '–' }}
+      </dd>
+    </div>
+  </dl>
+
+  <div class="tools">
+    <button
+      type="button"
+      class="btn icon"
+      [disabled]="!store.history.canUndo()"
+      (click)="store.undo()"
       title="Отменить (Ctrl+Z)"
+      aria-label="Отменить"
     >
       ↶
     </button>
     <button
       type="button"
-      class="btn ghost"
-      [disabled]="!history.canRedo()"
-      (click)="redo()"
+      class="btn icon"
+      [disabled]="!store.history.canRedo()"
+      (click)="store.redo()"
       title="Повторить (Ctrl+Shift+Z)"
+      aria-label="Повторить"
     >
       ↷
     </button>
+    <button
+      type="button"
+      class="btn icon"
+      (click)="toggleTheme()"
+      [attr.aria-label]="theme() === 'dark' ? 'Светлая тема' : 'Тёмная тема'"
+      [title]="theme() === 'dark' ? 'Светлая тема' : 'Тёмная тема'"
+    >
+      {{ theme() === 'dark' ? '☀' : '☾' }}
+    </button>
   </div>
-
-  <button type="button" class="btn" [class.active]="spiking()" (click)="toggleSpike()">
-    Spike ×4
-  </button>
-  <button type="button" class="btn ghost" (click)="toggleTheme()">
-    {{ theme() === 'dark' ? 'Светлая тема' : 'Тёмная тема' }}
-  </button>
 </header>
 
-<main class="layout">
-  <section class="board" aria-label="Доска">
-    @switch (board()) {
-      @case ('foblex') {
-        @defer (on immediate) {
-          <ll-board-foblex
-            [doc]="sim.doc()"
-            [result]="sim.result()"
-            [fitKey]="loadCount()"
-            [selection]="selection()"
-            (selectionChange)="selectSelection($event)"
-            (move)="onMove($event)"
-            (connect)="onConnect($event)"
-            (reconnect)="onReconnect($event)"
-          />
-        } @loading {
-          <p class="board-loading">Загружаю доску…</p>
-        }
-      }
-      @case ('vflow') {
-        @defer (on immediate) {
-          <ll-board-vflow
-            [doc]="sim.doc()"
-            [result]="sim.result()"
-            [fitKey]="loadCount()"
-            [selection]="selection()"
-            (selectionChange)="selectSelection($event)"
-            (move)="onMove($event)"
-            (connect)="onConnect($event)"
-            (reconnect)="onReconnect($event)"
-          />
-        } @loading {
-          <p class="board-loading">Загружаю доску…</p>
-        }
-      }
-      @default {
-        <ll-board-preview
-          [doc]="sim.doc()"
-          [result]="sim.result()"
-          [selectedId]="selectedId()"
-          (select)="selectSelection({ nodeId: $event, edgeId: null })"
+<main class="main">
+  <ll-palette [presets]="sim.presets()" (add)="store.requestAdd($event)" />
+
+  <section class="center">
+    <div class="board">
+      @defer (on immediate) {
+        <ll-board
+          [doc]="store.doc()"
+          [result]="store.result()"
+          [fitKey]="store.loadCount()"
+          [selection]="store.selection()"
+          [backlog]="store.backlog()"
+          [playing]="store.playing()"
+          [addRequest]="store.addRequest()"
+          (selectionChange)="store.select($event)"
+          (move)="store.move($event)"
+          (connect)="store.connect($event)"
+          (reconnect)="store.reconnect($event)"
+          (add)="store.addNode($event.kind, $event.pos)"
         />
+      } @loading {
+        <p class="loading">Загружаю доску…</p>
       }
-    }
-    <ll-fps-meter />
+      @if (bench) {
+        <ll-fps-meter />
+      }
+    </div>
+    <ll-event-log [entries]="store.log()" [clock]="store.clock()" />
   </section>
 
-  <aside class="side">
-    <section class="card">
-      <h2>Система</h2>
-      <ll-metrics-panel [result]="sim.result()" />
-    </section>
-    <section class="card">
-      <ll-inspector
-        [node]="selectedNode()"
-        [result]="sim.result()"
-        [presets]="sim.presets()"
-        (change)="applyNodeChange($event)"
-      />
-    </section>
-    @if (sim.error(); as err) {
-      <p class="error">{{ err }}</p>
-    }
-  </aside>
+  <ll-inspector />
 </main>

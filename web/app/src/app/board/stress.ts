@@ -21,7 +21,7 @@ const COLUMN_KINDS: NodeKind[] = [
  */
 export function stressDocument(count = 200): LoadlineDocument {
   const perColumn = Math.ceil((count - 1) / COLUMN_KINDS.length);
-  const nodes: Node[] = [{ id: 'client', kind: 'client', pos: { x: 0, y: (perColumn * 80) / 2 } }];
+  const nodes: Node[] = [{ id: 'client', kind: 'client', pos: { x: 0, y: (perColumn * 96) / 2 } }];
   const edges: Edge[] = [];
 
   // Детерминированный «случайный» выбор родителя: схема одинакова при каждом запуске.
@@ -39,7 +39,7 @@ export function stressDocument(count = 200): LoadlineDocument {
       nodes.push({
         id,
         kind: COLUMN_KINDS[col]!,
-        pos: { x: (col + 1) * 220, y: row * 80 },
+        pos: { x: (col + 1) * 264, y: row * 96 },
         params: { replicas: 40 },
       });
       const parent = prev[Math.floor(next() * prev.length)]!;

@@ -8,12 +8,12 @@
   },
   "traffic": { "rps": 3000, "readShare": 0.6, "spike": 1 },
   "nodes": [
-    { "id": "client", "kind": "client", "preset": "client.default", "pos": { "x": 40, "y": 220 } },
-    { "id": "gw", "kind": "api-gateway", "preset": "gateway.default", "pos": { "x": 200, "y": 220 } },
-    { "id": "api", "kind": "service", "preset": "service.small", "pos": { "x": 360, "y": 220 }, "params": { "replicas": 4 } },
-    { "id": "history", "kind": "nosql", "preset": "nosql.default", "pos": { "x": 540, "y": 120 } },
-    { "id": "queue", "kind": "queue", "preset": "queue.default", "pos": { "x": 540, "y": 320 } },
-    { "id": "delivery", "kind": "worker", "preset": "worker.small", "pos": { "x": 720, "y": 320 }, "params": { "replicas": 3 } }
+    { "id": "client", "kind": "client", "preset": "client.default", "pos": { "x": 60, "y": 216 } },
+    { "id": "gw", "kind": "api-gateway", "preset": "gateway.default", "pos": { "x": 300, "y": 216 } },
+    { "id": "api", "kind": "service", "preset": "service.small", "pos": { "x": 540, "y": 216 }, "params": { "replicas": 4 } },
+    { "id": "history", "kind": "nosql", "preset": "nosql.default", "pos": { "x": 816, "y": 120 } },
+    { "id": "queue", "kind": "queue", "preset": "queue.default", "pos": { "x": 816, "y": 324 } },
+    { "id": "delivery", "kind": "worker", "preset": "worker.small", "pos": { "x": 1080, "y": 324 }, "params": { "replicas": 3 } }
   ],
   "edges": [
     { "id": "e1", "from": "client:out", "to": "gw:in" },

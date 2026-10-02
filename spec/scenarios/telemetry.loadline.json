@@ -9,13 +9,13 @@
   "traffic": { "rps": 3000, "readShare": 0, "spike": 1 },
   "nodes": [
     { "id": "c", "kind": "client", "label": "Датчики", "preset": "client.default", "pos": { "x": 0, "y": 204 } },
-    { "id": "gw", "kind": "api-gateway", "label": "ingest-gw", "preset": "gateway.default", "pos": { "x": 240, "y": 204 } },
-    { "id": "val", "kind": "service", "label": "validate", "preset": "service.small", "pos": { "x": 480, "y": 204 }, "params": { "replicas": 4 } },
-    { "id": "q", "kind": "queue", "label": "telemetry", "preset": "queue.default", "pos": { "x": 720, "y": 204 } },
-    { "id": "agg", "kind": "worker", "label": "aggregator", "preset": "worker.small", "pos": { "x": 960, "y": 96 }, "params": { "replicas": 12 } },
-    { "id": "ts", "kind": "nosql", "label": "timeseries", "preset": "nosql.default", "pos": { "x": 1200, "y": 96 } },
-    { "id": "ix", "kind": "worker", "label": "indexer", "preset": "worker.small", "pos": { "x": 960, "y": 312 }, "params": { "replicas": 6 } },
-    { "id": "es", "kind": "search", "label": "logs-index", "preset": "search.default", "pos": { "x": 1200, "y": 312 } }
+    { "id": "gw", "kind": "api-gateway", "label": "ingest-gw", "preset": "gateway.default", "pos": { "x": 264, "y": 204 } },
+    { "id": "val", "kind": "service", "label": "validate", "preset": "service.small", "pos": { "x": 528, "y": 204 }, "params": { "replicas": 4 } },
+    { "id": "q", "kind": "queue", "label": "telemetry", "preset": "queue.default", "pos": { "x": 792, "y": 204 } },
+    { "id": "agg", "kind": "worker", "label": "aggregator", "preset": "worker.small", "pos": { "x": 1056, "y": 96 }, "params": { "replicas": 12 } },
+    { "id": "ts", "kind": "nosql", "label": "timeseries", "preset": "nosql.default", "pos": { "x": 1320, "y": 96 } },
+    { "id": "ix", "kind": "worker", "label": "indexer", "preset": "worker.small", "pos": { "x": 1056, "y": 312 }, "params": { "replicas": 6 } },
+    { "id": "es", "kind": "search", "label": "logs-index", "preset": "search.default", "pos": { "x": 1320, "y": 312 } }
   ],
   "edges": [
     { "id": "e1", "from": "c:out", "to": "gw:in" },

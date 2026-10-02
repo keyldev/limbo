@@ -8,11 +8,11 @@
   },
   "traffic": { "rps": 2000, "readShare": 0.9, "spike": 1 },
   "nodes": [
-    { "id": "client", "kind": "client", "preset": "client.default", "pos": { "x": 40, "y": 200 } },
-    { "id": "lb", "kind": "load-balancer", "preset": "lb.default", "pos": { "x": 200, "y": 200 }, "params": { "replicas": 1 } },
-    { "id": "api", "kind": "service", "preset": "service.small", "pos": { "x": 380, "y": 200 }, "params": { "replicas": 3 } },
-    { "id": "cache", "kind": "cache", "preset": "cache.redis-small", "pos": { "x": 560, "y": 120 }, "params": { "replicas": 1, "hitRatio": 0.8 } },
-    { "id": "db", "kind": "sql-primary", "preset": "sql.primary-medium", "pos": { "x": 740, "y": 200 }, "params": { "replicas": 1 } }
+    { "id": "client", "kind": "client", "preset": "client.default", "pos": { "x": 60, "y": 204 } },
+    { "id": "lb", "kind": "load-balancer", "preset": "lb.default", "pos": { "x": 300, "y": 204 }, "params": { "replicas": 1 } },
+    { "id": "api", "kind": "service", "preset": "service.small", "pos": { "x": 576, "y": 204 }, "params": { "replicas": 3 } },
+    { "id": "cache", "kind": "cache", "preset": "cache.redis-small", "pos": { "x": 840, "y": 120 }, "params": { "replicas": 1, "hitRatio": 0.8 } },
+    { "id": "db", "kind": "sql-primary", "preset": "sql.primary-medium", "pos": { "x": 1116, "y": 204 }, "params": { "replicas": 1 } }
   ],
   "edges": [
     { "id": "e1", "from": "client:out", "to": "lb:in" },

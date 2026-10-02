@@ -1,0 +1,297 @@
+@if (node(); as n) {
+  @let m = metrics();
+  @let r = resolved()!;
+  <div class="ins">
+    <p class="eyebrow"><ll-icon [kind]="n.kind" [size]="14" /> {{ kindLabel() }}</p>
+    <label class="field">
+      <span>Имя</span>
+      <input type="text" [value]="n.label ?? n.id" (input)="rename($any($event.target).value)" />
+    </label>
+    <p class="note">{{ routingText() }}</p>
+
+    @if (n.kind === 'client') {
+      @let s = system();
+      <div class="reads">
+        <div class="read">
+          <span>Отправляет</span><b>{{ fmt(s?.incomingRps ?? 0) }} rps</b>
+        </div>
+        <div class="read">
+          <span>Успешных запросов</span>
+          <b [class]="'t-' + tone(s?.errorRate ?? 0, 0.001, 0.05)">{{
+            errorPct(1 - (s?.errorRate ?? 0))
+          }}</b>
+        </div>
+        <div class="read">
+          <span>Средняя задержка</span><b>{{ fmtMs(s?.meanLatencyMs ?? 0) }}</b>
+        </div>
+        <div class="read">
+          <span>p99</span><b>{{ fmtMs(s?.p99Ms ?? 0) }}</b>
+        </div>
+      </div>
+      <p class="note small">Трафик задаётся слайдером в шапке.</p>
+    } @else {
+      <div class="row">
+        <div class="field">
+          <span>Реплики</span>
+          <span class="stepper">
+            <button
+              type="button"
+              (click)="stepReplicas(-1)"
+              [disabled]="r.replicas <= 1"
+              aria-label="Убрать реплику"
+            >
+              −
+            </button>
+            <b>{{ r.replicas }}</b>
+            <button
+              type="button"
+              (click)="stepReplicas(1)"
+              [disabled]="r.replicas >= 64"
+              aria-label="Добавить реплику"
+            >
+              +
+            </button>
+          </span>
+        </div>
+        <label class="field">
+          <span>Ёмкость реплики</span>
+          <span class="num">
+            <input
+              type="number"
+              min="1"
+              max="1000000"
+              step="10"
+              [value]="r.capacityRps"
+              (input)="setNumber('capacityRps', $any($event.target).value, 1, 1000000)"
+            />
+            <em>rps</em>
+          </span>
+        </label>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>Базовая задержка</span>
+          <span class="num">
+            <input
+              type="number"
+              min="0"
+              max="5000"
+              [value]="r.baseLatencyMs"
+              (input)="setNumber('baseLatencyMs', $any($event.target).value, 0, 5000)"
+            />
+            <em>мс</em>
+          </span>
+        </label>
+        <label class="field">
+          <span>Цена реплики</span>
+          <span class="num">
+            <input
+              type="number"
+              min="0"
+              max="100000"
+              step="5"
+              [value]="r.costPerReplicaUsd"
+              (input)="setNumber('costPerReplicaUsd', $any($event.target).value, 0, 100000)"
+            />
+            <em>$/мес</em>
+          </span>
+        </label>
+      </div>
+      @if (hasHitRatio()) {
+        <label class="field">
+          <span
+            >Hit ratio <b class="inline">{{ pct(r.hitRatio) }}</b></span
+          >
+          <input
+            type="range"
+            min="0"
+            max="99"
+            [value]="r.hitRatio * 100"
+            (input)="setParam('hitRatio', +$any($event.target).value / 100)"
+          />
+        </label>
+      }
+      <label class="switch">
+        <input
+          type="checkbox"
+          [checked]="r.outage"
+          (change)="setParam('outage', $any($event.target).checked)"
+        />
+        <span class="track" aria-hidden="true"><span></span></span>
+        Simulate outage
+      </label>
+
+      @if (m) {
+        <div class="gauge" [attr.data-status]="m.status">
+          <div class="bar">
+            <span [style.width.%]="m.rho * 100 > 100 ? 100 : m.rho * 100"></span>
+          </div>
+          <div class="gaugetxt">
+            <span [class]="'t-' + m.status">{{
+              r.outage ? 'Отключён' : pct(m.rho) + ' занят'
+            }}</span>
+            <span>{{ fmt(m.lambda) }} / {{ fmt(m.capacityRps) }} rps</span>
+          </div>
+        </div>
+        <div class="reads">
+          <div class="read">
+            <span>Входящий поток</span><b>{{ fmt(m.lambda) }} rps</b>
+          </div>
+          <div class="read">
+            <span>Обслужено</span><b>{{ fmt(m.servedRps) }} rps</b>
+          </div>
+          @if (m.behindQueue) {
+            <div class="read">
+              <span>Отстаёт на</span>
+              <b [class.t-over]="m.droppedRps > 0.5">{{ fmt(m.droppedRps) }} сообщ./с</b>
+            </div>
+          } @else {
+            <div class="read">
+              <span>Теряет</span>
+              <b [class.t-over]="m.droppedRps > 0.5">{{ fmt(m.droppedRps) }} rps</b>
+            </div>
+          }
+          @if (hasHitRatio()) {
+            <div class="read">
+              <span>Уходит дальше</span><b>{{ fmt(m.servedRps * (1 - r.hitRatio)) }} rps</b>
+            </div>
+          }
+          @if (n.kind === 'queue') {
+            @let backlog = store.backlog()[n.id] ?? 0;
+            <div class="read">
+              <span>Backlog</span>
+              <b
+                [class.t-over]="backlog > 1 && m.backlogRps > 0"
+                [class.t-hot]="backlog > 1 && m.backlogRps <= 0"
+              >
+                {{ fmt(backlog) }} сообщ.
+              </b>
+            </div>
+          }
+          <div class="read">
+            <span>Задержка сейчас</span>
+            <b
+              [class.t-over]="m.meanLatencyMs > r.baseLatencyMs * 3"
+              [class.t-hot]="
+                m.meanLatencyMs > r.baseLatencyMs * 1.5 && m.meanLatencyMs <= r.baseLatencyMs * 3
+              "
+            >
+              {{ fmtMs(m.meanLatencyMs) }}
+            </b>
+          </div>
+          <div class="read">
+            <span>p99 узла</span><b>{{ fmtMs(m.p99Ms) }}</b>
+          </div>
+          <div class="read">
+            <span>Стоимость</span><b>{{ money(m.costMonthlyUsd) }}/мес</b>
+          </div>
+        </div>
+
+        <details class="explain">
+          <summary>Как посчитано</summary>
+          <ul>
+            @for (x of explanation(); track x.metric) {
+              <li>
+                <span class="muted">{{ x.formula }}</span>
+                <span>{{ x.substituted }}</span>
+                <b>{{ x.result }}</b>
+              </li>
+            }
+          </ul>
+        </details>
+      }
+    }
+    <button type="button" class="danger" (click)="store.removeSelected()">
+      Удалить «{{ n.label ?? n.id }}»
+    </button>
+  </div>
+} @else if (edgeInfo(); as e) {
+  <div class="ins">
+    <p class="eyebrow">Связь</p>
+    <h2>{{ e.fromName }} → {{ e.toName }}</h2>
+    <p class="note">{{ e.routingText }}</p>
+    @if (e.canBeParallel) {
+      <div class="seg" role="radiogroup" aria-label="Как вызывается">
+        <button
+          type="button"
+          role="radio"
+          [attr.aria-checked]="e.mode === 'sequential'"
+          (click)="store.setEdgeMode(edge()!.id, 'sequential')"
+        >
+          По очереди
+        </button>
+        <button
+          type="button"
+          role="radio"
+          [attr.aria-checked]="e.mode === 'parallel'"
+          (click)="store.setEdgeMode(edge()!.id, 'parallel')"
+        >
+          Параллельно
+        </button>
+      </div>
+    }
+    <div class="reads">
+      <div class="read">
+        <span>Поток</span><b>{{ fmt(e.rps) }} rps</b>
+      </div>
+      @if (e.target) {
+        <div class="read">
+          <span>Загрузка получателя</span
+          ><b [class]="'t-' + e.target.status">{{ pct(e.target.rho) }}</b>
+        </div>
+      }
+    </div>
+    <button type="button" class="danger" (click)="store.removeSelected()">Удалить связь</button>
+  </div>
+} @else {
+  @let s = system();
+  <div class="ins">
+    <p class="eyebrow">Система</p>
+    <h2>Загрузка по узлам</h2>
+    <p class="note">
+      Самые загруженные сверху. Выберите узел на доске, чтобы поменять реплики, ёмкость и задержку
+      или отключить его.
+    </p>
+    <ul class="hotlist">
+      @for (x of hotList(); track x.node.id) {
+        <li>
+          <button type="button" (click)="store.selectNode(x.node.id)">
+            <span class="ico sm"><ll-icon [kind]="x.node.kind" [size]="14" /></span>
+            <span class="hname">{{ x.node.label ?? x.node.id }}</span>
+            <span class="hval" [class]="'t-' + x.m!.status">{{
+              x.node.params?.outage ? 'down' : pct(x.m!.rho)
+            }}</span>
+            <span class="bar" [attr.data-status]="x.m!.status"
+              ><span [style.width.%]="x.m!.rho * 100 > 100 ? 100 : x.m!.rho * 100"></span
+            ></span>
+          </button>
+        </li>
+      } @empty {
+        <li class="note">Трафик пока никуда не доходит. Свяжите клиента с чем-нибудь.</li>
+      }
+    </ul>
+    <div class="reads">
+      <div class="read">
+        <span>Входящий трафик</span><b>{{ fmt(s?.incomingRps ?? 0) }} rps</b>
+      </div>
+      <div class="read">
+        <span>Успешных запросов</span>
+        <b [class]="'t-' + tone(s?.errorRate ?? 0, 0.001, 0.05)">{{
+          errorPct(1 - (s?.errorRate ?? 0))
+        }}</b>
+      </div>
+      <div class="read">
+        <span>p50 / p95 / p99</span
+        ><b>{{ fmtMs(s?.p50Ms ?? 0) }} · {{ fmtMs(s?.p95Ms ?? 0) }} · {{ fmtMs(s?.p99Ms ?? 0) }}</b>
+      </div>
+      <div class="read">
+        <span>Стоимость</span><b>{{ money(s?.costMonthlyUsd ?? 0) }}/мес</b>
+      </div>
+    </div>
+    <p class="note small">
+      Модель стационарная. Узел обслуживает до реплики × ёмкость; после ~70% загрузки очередь
+      поднимает задержку; после 100% лишние запросы теряются, а за очередью копятся в backlog.
+      Формулы — в «Как посчитано» у каждого узла.
+    </p>
+  </div>
+}

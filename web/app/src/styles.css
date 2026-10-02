@@ -1,5 +1,5 @@
 /*
- * Дизайн-токены Loadline. Принципы — в docs/design.md:
+ * Дизайн-токены Loadline. Принципы — в плане развития, раздел «Дизайн»:
  * графит, один акцент, цвет означает состояние, тёмная тема по умолчанию.
  * Тема переключается атрибутом data-theme на <html>; без него — по prefers-color-scheme.
  */
@@ -10,16 +10,22 @@
   --ll-surface: #1d2024;
   --ll-surface-2: #262a2f;
   --ll-border: #33383e;
+  --ll-wire: #5b636c;
   --ll-text: #e6e8eb;
   --ll-text-muted: #9aa1a9;
   --ll-accent: #6ea8fe;
+  --ll-accent-ink: #10141a;
 
   /* Состояние загрузки: только для загрузки и ничего больше */
   --ll-ok: #4cc38a;
   --ll-warm: #e5b445;
   --ll-hot: #ef5b5b;
   --ll-down: #6b7178;
+  --ll-ok-soft: #16302a;
+  --ll-warm-soft: #33290f;
+  --ll-hot-soft: #3b1d1f;
 
+  --ll-shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 8px 20px rgb(0 0 0 / 25%);
   --ll-radius: 8px;
   --ll-font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --ll-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
@@ -33,13 +39,19 @@
     --ll-surface: #ffffff;
     --ll-surface-2: #eceef1;
     --ll-border: #d5d9de;
+    --ll-wire: #98a1ab;
     --ll-text: #1b1e22;
     --ll-text-muted: #5d646c;
     --ll-accent: #2f6fde;
+    --ll-accent-ink: #ffffff;
     --ll-ok: #1f9d63;
     --ll-warm: #b7860f;
     --ll-hot: #d43c3c;
     --ll-down: #8a9097;
+    --ll-ok-soft: #dbf0e5;
+    --ll-warm-soft: #faedd2;
+    --ll-hot-soft: #f8dddd;
+    --ll-shadow: 0 1px 2px rgb(21 32 43 / 7%), 0 6px 16px rgb(21 32 43 / 6%);
     color-scheme: light;
   }
 }
@@ -49,13 +61,19 @@
   --ll-surface: #ffffff;
   --ll-surface-2: #eceef1;
   --ll-border: #d5d9de;
+  --ll-wire: #98a1ab;
   --ll-text: #1b1e22;
   --ll-text-muted: #5d646c;
   --ll-accent: #2f6fde;
+  --ll-accent-ink: #ffffff;
   --ll-ok: #1f9d63;
   --ll-warm: #b7860f;
   --ll-hot: #d43c3c;
   --ll-down: #8a9097;
+  --ll-ok-soft: #dbf0e5;
+  --ll-warm-soft: #faedd2;
+  --ll-hot-soft: #f8dddd;
+  --ll-shadow: 0 1px 2px rgb(21 32 43 / 7%), 0 6px 16px rgb(21 32 43 / 6%);
   color-scheme: light;
 }
 
@@ -75,11 +93,26 @@ body {
   background: var(--ll-bg);
   color: var(--ll-text);
   font-family: var(--ll-font);
-  font-size: 14px;
-  line-height: 1.45;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
-button {
+button,
+input,
+select {
   font: inherit;
   color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ll-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
 }

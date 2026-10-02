@@ -9,15 +9,15 @@
   "traffic": { "rps": 1500, "readShare": 0.8, "spike": 1 },
   "nodes": [
     { "id": "c", "kind": "client", "label": "Веб и мобильные", "preset": "client.default", "pos": { "x": 0, "y": 204 } },
-    { "id": "cdn", "kind": "cdn", "label": "edge-cdn", "preset": "cdn.default", "pos": { "x": 240, "y": 204 }, "params": { "hitRatio": 0.55 } },
-    { "id": "lb", "kind": "load-balancer", "label": "public-lb", "preset": "lb.default", "pos": { "x": 480, "y": 204 } },
-    { "id": "a", "kind": "service", "label": "api-a", "preset": "service.small", "pos": { "x": 720, "y": 96 } },
-    { "id": "b", "kind": "service", "label": "api-b", "preset": "service.small", "pos": { "x": 720, "y": 312 } },
-    { "id": "rc", "kind": "cache", "label": "hot-cache", "preset": "cache.redis-small", "pos": { "x": 960, "y": 96 } },
-    { "id": "db", "kind": "sql-primary", "label": "orders-db", "preset": "sql.primary-medium", "pos": { "x": 1200, "y": 96 } },
-    { "id": "q", "kind": "queue", "label": "events", "preset": "queue.default", "pos": { "x": 960, "y": 312 } },
-    { "id": "w", "kind": "worker", "label": "thumbnailer", "preset": "worker.small", "pos": { "x": 1200, "y": 312 }, "params": { "replicas": 2 } },
-    { "id": "s3", "kind": "object-storage", "label": "media-bucket", "preset": "storage.object", "pos": { "x": 1440, "y": 312 } }
+    { "id": "cdn", "kind": "cdn", "label": "edge-cdn", "preset": "cdn.default", "pos": { "x": 264, "y": 204 }, "params": { "hitRatio": 0.55 } },
+    { "id": "lb", "kind": "load-balancer", "label": "public-lb", "preset": "lb.default", "pos": { "x": 528, "y": 204 } },
+    { "id": "a", "kind": "service", "label": "api-a", "preset": "service.small", "pos": { "x": 792, "y": 96 } },
+    { "id": "b", "kind": "service", "label": "api-b", "preset": "service.small", "pos": { "x": 792, "y": 312 } },
+    { "id": "rc", "kind": "cache", "label": "hot-cache", "preset": "cache.redis-small", "pos": { "x": 1056, "y": 96 } },
+    { "id": "db", "kind": "sql-primary", "label": "orders-db", "preset": "sql.primary-medium", "pos": { "x": 1320, "y": 96 } },
+    { "id": "q", "kind": "queue", "label": "events", "preset": "queue.default", "pos": { "x": 1056, "y": 312 } },
+    { "id": "w", "kind": "worker", "label": "thumbnailer", "preset": "worker.small", "pos": { "x": 1320, "y": 312 }, "params": { "replicas": 2 } },
+    { "id": "s3", "kind": "object-storage", "label": "media-bucket", "preset": "storage.object", "pos": { "x": 1584, "y": 312 } }
   ],
   "edges": [
     { "id": "e1", "from": "c:out", "to": "cdn:in" },

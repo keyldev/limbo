@@ -1,88 +1,134 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
-import { explainNode, resolveNode, type SimulationResult } from '@loadline/engine';
-import type { Node as DiagramNode, Preset } from '@loadline/model';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { explainNode, resolveNode, routingOf } from '@loadline/engine';
+import type { NodeParams } from '@loadline/model';
+import { nodeIdOfPort } from '../board/board-contract';
+import { Icon } from '../catalog/icon';
+import { ROUTING_TEXT, kindInfo } from '../catalog/kinds';
+import { EditorStore } from '../editor/editor-store';
+import { SimulationService } from '../simulation/simulation.service';
+import { errorPct, fmt, fmtMs, money, pct } from '../ui/format';
 
-export interface NodeChange {
-  id: string;
-  replicas?: number;
-  outage?: boolean;
-}
+const HOT_LIST = 7;
 
+/**
+ * Правая панель. Выбран узел — его параметры и показания; выбрана связь — поток по ней;
+ * ничего не выбрано — загрузка системы по узлам.
+ */
 @Component({
   selector: 'll-inspector',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    @if (node(); as n) {
-      <header>
-        <h2>{{ n.label ?? n.id }}</h2>
-        <span class="mono muted">{{ n.kind }}</span>
-      </header>
-
-      <div class="row">
-        <span>Реплики</span>
-        <div class="stepper">
-          <button type="button" (click)="emitReplicas(-1)" [disabled]="replicas() <= 1" aria-label="Меньше реплик">−</button>
-          <span class="mono">{{ replicas() }}</span>
-          <button type="button" (click)="emitReplicas(1)" aria-label="Больше реплик">+</button>
-        </div>
-      </div>
-
-      <label class="row">
-        <span>Simulate outage</span>
-        <input type="checkbox" [checked]="n.params?.outage ?? false" (change)="toggleOutage($event)" />
-      </label>
-
-      <h3>Как посчитано</h3>
-      <ul class="explain">
-        @for (x of explanation(); track x.metric) {
-          <li>
-            <span class="mono muted">{{ x.formula }}</span>
-            <span class="mono">{{ x.substituted }}</span>
-            <span class="mono strong">{{ x.result }}</span>
-          </li>
-        }
-      </ul>
-    } @else {
-      <p class="muted">Выберите узел на схеме.</p>
-    }
-  `,
-  styles: `
-    header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-    h2 { font-size: 15px; margin: 0 0 12px; }
-    h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ll-text-muted); margin: 20px 0 8px; }
-    .row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--ll-border); }
-    .stepper { display: flex; align-items: center; gap: 10px; }
-    .stepper button { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--ll-border); background: var(--ll-surface-2); cursor: pointer; }
-    .stepper button:disabled { opacity: 0.4; cursor: default; }
-    .explain { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-    .explain li { display: grid; gap: 2px; font-size: 12px; }
-    .mono { font-family: var(--ll-mono); }
-    .muted { color: var(--ll-text-muted); }
-    .strong { color: var(--ll-text); font-weight: 600; }
-  `,
+  imports: [Icon],
+  templateUrl: './inspector.html',
+  styleUrl: './inspector.css',
 })
 export class Inspector {
-  readonly node = input<DiagramNode | null>(null);
-  readonly result = input<SimulationResult | null>(null);
-  readonly presets = input<Preset[]>([]);
-  readonly change = output<NodeChange>();
+  protected readonly store = inject(EditorStore);
+  private readonly sim = inject(SimulationService);
 
-  protected readonly replicas = computed(() => this.node()?.params?.replicas ?? 1);
+  protected readonly fmt = fmt;
+  protected readonly fmtMs = fmtMs;
+  protected readonly money = money;
+  protected readonly pct = pct;
+  protected readonly errorPct = errorPct;
 
-  protected readonly explanation = computed(() => {
+  protected readonly node = this.store.selectedNode;
+  protected readonly edge = this.store.selectedEdge;
+
+  protected readonly metrics = computed(() => {
     const n = this.node();
-    const m = n ? this.result()?.nodes[n.id] : undefined;
-    if (!n || !m) return [];
-    return explainNode(resolveNode(n, this.presets(), []), m);
+    return n ? this.store.result()?.nodes[n.id] : undefined;
   });
 
-  protected emitReplicas(delta: number): void {
+  /** Параметры узла с подставленным пресетом: то, что реально считает движок. */
+  protected readonly resolved = computed(() => {
     const n = this.node();
-    if (n) this.change.emit({ id: n.id, replicas: Math.max(1, this.replicas() + delta) });
+    return n ? resolveNode(n, this.sim.presets(), []) : null;
+  });
+
+  protected readonly kindLabel = computed(() => {
+    const n = this.node();
+    return n ? kindInfo(n.kind).label : '';
+  });
+
+  protected readonly routingText = computed(() => {
+    const n = this.node();
+    if (!n) return '';
+    return n.kind === 'client' ? ROUTING_TEXT.source : ROUTING_TEXT[routingOf(n.kind)];
+  });
+
+  protected readonly hasHitRatio = computed(() => {
+    const k = this.node()?.kind;
+    return k === 'cache' || k === 'cdn';
+  });
+
+  protected readonly explanation = computed(() => {
+    const r = this.resolved();
+    const m = this.metrics();
+    return r && m ? explainNode(r, m) : [];
+  });
+
+  protected readonly edgeInfo = computed(() => {
+    const e = this.edge();
+    const doc = this.store.doc();
+    const result = this.store.result();
+    if (!e || !doc) return null;
+    const from = doc.nodes.find((n) => n.id === nodeIdOfPort(e.from));
+    const toId = nodeIdOfPort(e.to);
+    const routing = from ? (from.kind === 'client' ? 'source' : routingOf(from.kind)) : 'fanout';
+    return {
+      fromName: this.store.nameOf(nodeIdOfPort(e.from)),
+      toName: this.store.nameOf(toId),
+      routingText: ROUTING_TEXT[routing],
+      canBeParallel: routing === 'fanout',
+      mode: e.mode ?? 'sequential',
+      rps: result?.edges[e.id]?.rps ?? 0,
+      target: result?.nodes[toId],
+    };
+  });
+
+  protected readonly hotList = computed(() => {
+    const doc = this.store.doc();
+    const result = this.store.result();
+    if (!doc || !result) return [];
+    return doc.nodes
+      .filter((n) => n.kind !== 'client')
+      .map((n) => ({ node: n, m: result.nodes[n.id] }))
+      .filter((x) => x.m && (x.m.lambda > 0 || x.node.params?.outage))
+      .sort((a, b) => b.m!.rho - a.m!.rho)
+      .slice(0, HOT_LIST);
+  });
+
+  protected readonly system = computed(() => this.store.result()?.system ?? null);
+
+  protected setParam<K extends keyof NodeParams>(key: K, value: NodeParams[K]): void {
+    const n = this.node();
+    if (n) this.store.updateNode(n.id, { params: { [key]: value } });
   }
 
-  protected toggleOutage(event: Event): void {
+  /** Числовое поле: пустое или вне диапазона — не применяем, пусть пользователь допечатает. */
+  protected setNumber(
+    key: 'capacityRps' | 'baseLatencyMs' | 'costPerReplicaUsd',
+    raw: string,
+    min: number,
+    max: number,
+  ): void {
+    const v = Number(raw);
+    if (raw.trim() === '' || !Number.isFinite(v) || v < min || v > max) return;
+    this.setParam(key, v);
+  }
+
+  protected stepReplicas(delta: number): void {
+    const r = this.resolved();
+    if (r) this.setParam('replicas', Math.min(64, Math.max(1, r.replicas + delta)));
+  }
+
+  protected rename(value: string): void {
     const n = this.node();
-    if (n) this.change.emit({ id: n.id, outage: (event.target as HTMLInputElement).checked });
+    const label = value.trim();
+    if (n && label) this.store.updateNode(n.id, { label });
+  }
+
+  protected tone(rate: number, warn: number, bad: number): string {
+    return rate >= bad ? 'over' : rate >= warn ? 'hot' : 'ok';
   }
 }

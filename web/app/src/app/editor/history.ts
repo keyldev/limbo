@@ -1,6 +1,7 @@
 import { computed, signal } from '@angular/core';
 
 const LIMIT = 100;
+const COALESCE_MS = 1000;
 
 /**
  * Отмена и повтор правок схемы. Хранит снимки документа целиком: документы маленькие
@@ -14,13 +15,25 @@ export class History<T> {
   readonly canUndo = computed(() => this.past().length > 0);
   readonly canRedo = computed(() => this.future().length > 0);
 
-  /** Запомнить состояние до правки. Любая новая правка обнуляет повтор. */
-  record(before: T): void {
-    this.past.update((p) => [...p.slice(-(LIMIT - 1)), before]);
+  private lastKey: string | null = null;
+  private lastAt = 0;
+
+  /**
+   * Запомнить состояние до правки. Любая новая правка обнуляет повтор.
+   * Правки с одинаковым ключом подряд в пределах секунды (ввод имени по буквам,
+   * степпер реплик) склеиваются в один шаг отмены.
+   */
+  record(before: T, key?: string, now = Date.now()): void {
+    const coalesce = key !== undefined && key === this.lastKey && now - this.lastAt < COALESCE_MS;
+    this.lastKey = key ?? null;
+    this.lastAt = now;
     this.future.set([]);
+    if (coalesce) return;
+    this.past.update((p) => [...p.slice(-(LIMIT - 1)), before]);
   }
 
   undo(current: T): T | null {
+    this.lastKey = null;
     const p = this.past();
     const prev = p.at(-1);
     if (prev === undefined) return null;
@@ -39,6 +52,7 @@ export class History<T> {
   }
 
   clear(): void {
+    this.lastKey = null;
     this.past.set([]);
     this.future.set([]);
   }
