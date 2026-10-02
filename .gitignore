@@ -4,6 +4,9 @@ Thumbs.db
 .idea/
 *.swp
 
+# Локальные настройки Claude Code и его рабочие деревья
+.claude/
+
 # Фронт
 web/**/node_modules/
 web/**/dist/
