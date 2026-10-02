@@ -1,6 +1,6 @@
 name: Деплой фронта
 
-# Фронт — статика на Cloudflare Pages, API — на своём домене (ADR 0004, deploy/compose.yaml).
+# Фронт — статика на Cloudflare Pages: лендинг на /, доска на /app/. API — на своём домене (ADR 0004, deploy/compose.yaml).
 # Workflow ничего не делает, пока в настройках репозитория не заданы:
 #   Variables: CF_PAGES_PROJECT — имя проекта Pages, LOADLINE_API_URL — адрес API, например https://api.loadline.dev
 #   Secrets:   CLOUDFLARE_API_TOKEN (право Cloudflare Pages: Edit), CLOUDFLARE_ACCOUNT_ID
@@ -39,15 +39,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
+      # Лендинг на /, доска на /app/ с адресом API. Сайт собирается в web/dist/site.
       - name: Сборка с адресом API
         env:
           LOADLINE_API_URL: ${{ vars.LOADLINE_API_URL }}
         run: |
-          pnpm --filter "@loadline/app^..." build
+          pnpm -r --filter "!@loadline/app" build
           pnpm --filter @loadline/app build --define "LOADLINE_API_URL=\"'${LOADLINE_API_URL}'\""
+          node scripts/assemble-site.mjs
 
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy web/app/dist/app/browser --project-name=${{ vars.CF_PAGES_PROJECT }} --branch=main
+          command: pages deploy web/dist/site --project-name=${{ vars.CF_PAGES_PROJECT }} --branch=main

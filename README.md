@@ -13,6 +13,8 @@ loadline/
 │  ├─ packages/engine/       движок симуляции, чистый TS
 │  ├─ packages/model/        типы, сгенерированные из JSON Schema
 │  ├─ packages/api-client/   клиент API
+│  ├─ landing/               лендинг: статика на /, живое демо на движке
+│  ├─ scripts/               сборка сайта: лендинг на /, доска на /app/
 │  └─ app/                   Angular 22
 ├─ server/                   решение .NET 10 (Loadline.slnx)
 │  ├─ src/Loadline.Api/      Minimal API
@@ -39,7 +41,9 @@ cd web
 pnpm install
 pnpm build          # model → engine → api-client → app
 pnpm test           # тесты движка (golden + свойства) и приложения
-pnpm start          # http://localhost:4200
+pnpm start          # доска: http://localhost:4200
+pnpm start:landing  # лендинг: http://localhost:4300
+pnpm build:site     # сайт как на хостинге в web/dist/site: лендинг на /, доска на /app/
 
 # 2. Сервер (в другом терминале)
 cd server
@@ -75,7 +79,9 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env up -d --build
 
 `WEB_ORIGIN` попадает в `Cors:Origins` API: запросы принимаются только с домена фронта.
 
-**Фронт.** `.github/workflows/deploy-web.yml` собирает приложение и выкладывает его на Pages при пуше в `main`. Он ничего не делает, пока в настройках репозитория не заданы переменные `CF_PAGES_PROJECT` и `LOADLINE_API_URL` и секреты `CLOUDFLARE_API_TOKEN` и `CLOUDFLARE_ACCOUNT_ID`. Адрес API вшивается при сборке:
+**Фронт.** Сайт состоит из двух частей: лендинг на `/` и доска на `/app/` (в прод-сборке у доски `baseHref /app/`). Старые ссылки вида `/#s=…` лендинг сам переносит на `/app/`. Учебный сценарий открывается ссылкой `/app/#scenario=news-feed` (имя файла в `spec/scenarios` без `.loadline.json`): сценарий ложится поверх своей схемы, и Ctrl+Z её вернёт.
+
+`.github/workflows/deploy-web.yml` собирает сайт и выкладывает его на Pages при пуше в `main`. Он ничего не делает, пока в настройках репозитория не заданы переменные `CF_PAGES_PROJECT` и `LOADLINE_API_URL` и секреты `CLOUDFLARE_API_TOKEN` и `CLOUDFLARE_ACCOUNT_ID`. Адрес API вшивается при сборке:
 
 ```bash
 pnpm --filter @loadline/app build --define "LOADLINE_API_URL=\"'https://api.example.com'\""

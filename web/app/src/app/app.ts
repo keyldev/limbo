@@ -90,20 +90,36 @@ export class App {
   private async init(): Promise<void> {
     this.sim.presets.set(await this.spec.presets());
     if (await this.openLink(true)) return;
-    const saved = this.persistence.readAutosave();
-    if (saved) {
-      const at = saved.savedAt.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
-      this.openDocument(saved.doc, {
-        fresh: true,
-        note: `Восстановлена из браузера (${at}) схема`,
-      });
-      return;
-    }
-    await this.loadScenario(this.spec.scenarios[0]!.file, true);
+    if (!this.restoreAutosave()) await this.loadScenario(this.spec.scenarios[0]!.file, true);
   }
 
-  /** Открыть схему из ссылки в адресе (#s=… или #doc=…). Возвращает, получилось ли. */
+  private restoreAutosave(): boolean {
+    const saved = this.persistence.readAutosave();
+    if (!saved) return false;
+    const at = saved.savedAt.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
+    this.openDocument(saved.doc, { fresh: true, note: `Восстановлена из браузера (${at}) схема` });
+    return true;
+  }
+
+  /**
+   * Открыть схему из ссылки в адресе: #s=… или #doc=… (ADR 0004), или учебный сценарий
+   * #scenario=news-feed — так на сценарии ссылается лендинг. Возвращает, получилось ли.
+   */
   protected async openLink(fresh = false): Promise<boolean> {
+    const scenario = new URLSearchParams(location.hash.slice(1)).get('scenario');
+    if (scenario !== null) {
+      this.persistence.clearLocationLink();
+      const file = this.spec.scenarios.find((s) => s.file === `${scenario}.loadline.json`)?.file;
+      if (!file) {
+        if (fresh && !this.restoreAutosave()) await this.loadScenario(this.spec.scenarios[0]!.file, true);
+        this.store.push('warn', `Сценария «${scenario}» нет, открыта прежняя схема`);
+        return true;
+      }
+      // Сценарий ложится поверх своей схемы: Ctrl+Z вернёт её, автосохранение не пропадёт молча.
+      const hadOwn = fresh ? this.restoreAutosave() : true;
+      await this.loadScenario(file, !hadOwn);
+      return true;
+    }
     try {
       const linked = await this.persistence.openFromLocation();
       if (!linked) return false;

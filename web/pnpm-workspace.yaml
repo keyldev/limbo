@@ -1,5 +1,6 @@
 packages:
   - app
+  - landing
   - packages/*
 
 # Пакеты, которым разрешены install-скрипты (нативные бинарники сборщика Angular)

@@ -1,0 +1,20 @@
+{
+  "name": "@loadline/landing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Лендинг Loadline: статическая страница на / с живым демо на движке. Доска живёт на /app/.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node build.mjs",
+    "start": "node build.mjs --serve",
+    "test": "echo \"no tests\""
+  },
+  "dependencies": {
+    "@loadline/engine": "workspace:*",
+    "@loadline/model": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "typescript": "~6.0.2"
+  }
+}
