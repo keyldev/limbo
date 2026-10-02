@@ -44,7 +44,7 @@ function replicasWord(n: number): string {
 /** Узлы цепочки по порядку: id в сценарии и подписи. */
 const CHAIN = [
   { id: 'client', name: 'Пользователи', kind: 'клиенты' },
-  { id: 'lb', name: 'Балансировщик', kind: 'load balancer' },
+  { id: 'lb', name: 'Балансер', kind: 'load balancer' },
   { id: 'api', name: 'API', kind: 'сервис' },
   { id: 'cache', name: 'Кэш', kind: 'Redis' },
   { id: 'db', name: 'SQL', kind: 'основная база' },
