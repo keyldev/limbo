@@ -1,5 +1,13 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { latencyPercentile, meanLatency, percentileOfSorted, RHO_CAP, utilization } from './formulas.js';
+import {
+  latencyPercentile,
+  meanLatency,
+  percentileOfSorted,
+  percentilesOf,
+  RHO_CAP,
+  utilization,
+} from './formulas.js';
 import { createRng, sampleExp } from './rng.js';
 
 describe('формулы', () => {
@@ -24,6 +32,18 @@ describe('формулы', () => {
     const xs = Array.from({ length: 100 }, (_, i) => i + 1);
     expect(percentileOfSorted(xs, 0.95)).toBe(95);
     expect(percentileOfSorted([], 0.5)).toBe(0);
+  });
+
+  it('перцентили без сортировки совпадают с перцентилями по сортировке', () => {
+    const ps = [0.5, 0.95, 0.99, 0, 1];
+    fc.assert(
+      fc.property(fc.array(fc.oneof(fc.double({ min: 0, max: 1e4, noNaN: true }), fc.constantFrom(0, 1, 2))), (xs) => {
+        const sorted = [...xs].sort((a, b) => a - b);
+        const got = percentilesOf(Float64Array.from(xs), ps);
+        return ps.every((p, i) => got[i] === percentileOfSorted(sorted, p));
+      }),
+      { numRuns: 300 },
+    );
   });
 
   it('генератор детерминирован, среднее экспоненты сходится', () => {

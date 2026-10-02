@@ -1,6 +1,6 @@
 import type { Edge, LoadlineDocument, Node as DiagramNode, NodeKind, Preset } from '@loadline/model';
-import { latencyPercentile, meanLatency, percentileOfSorted, utilization } from './formulas.js';
-import { createRng, sampleExp, type Rng } from './rng.js';
+import { latencyPercentile, meanLatency, percentilesOf, utilization } from './formulas.js';
+import { createRng, type Rng } from './rng.js';
 
 /** Параметры узла после подстановки пресета. */
 export interface ResolvedNode {
@@ -75,6 +75,8 @@ export interface SystemMetrics {
   costMonthlyUsd: number;
   /** Узел с наибольшей загрузкой среди тех, до кого доходит трафик. */
   bottleneckId: string | null;
+  /** Сколько сэмплов Монте-Карло посчитано. */
+  samples: number;
 }
 
 export interface SimulationResult {
@@ -87,7 +89,10 @@ export interface SimulationResult {
 
 export interface SimulateOptions {
   presets: readonly Preset[];
-  /** Число сэмплов Монте-Карло. По умолчанию 20 000. */
+  /**
+   * Число сэмплов Монте-Карло. По умолчанию — из бюджета обхода (см. samplesFor):
+   * 20 000, а для схем, где один сэмпл обходит больше 50 узлов, меньше, но не меньше 2 000.
+   */
   samples?: number;
   /** Seed генератора. По умолчанию 1. */
   seed?: number;
@@ -302,47 +307,164 @@ function analyze(
   return { nodes, edges };
 }
 
+/** Коды маршрутизации в скомпилированном графе (Routing без строк). */
+const R_SPLIT = 0;
+const R_FANOUT = 1;
+const R_ASYNC = 2;
+/** Узел вне топологического порядка (в цикле): сэмпл проходит его за 0 мс. */
+const R_SKIP = 3;
+
+/**
+ * Граф для Монте-Карло в виде индексов и типизированных массивов: горячий цикл не трогает
+ * строки, Map и объекты метрик. Дети узла i лежат в child[childStart[i] .. childStart[i + 1]).
+ */
+interface Sampler {
+  routing: Uint8Array;
+  outage: Uint8Array;
+  /** Вероятность отказа из-за перегруза; -1, если потока нет и бросать монетку не нужно. */
+  dropP: Float64Array;
+  /** Среднее время ответа узла W, мс. */
+  mean: Float64Array;
+  /** hit ratio для кэша и CDN; -1 у остальных узлов. */
+  hit: Float64Array;
+  childStart: Int32Array;
+  child: Int32Array;
+  childParallel: Uint8Array;
+}
+
+function compileSampler(g: Graph, metrics: Record<string, NodeMetrics>, index: Map<string, number>): Sampler {
+  const count = g.nodes.size;
+  const s: Sampler = {
+    routing: new Uint8Array(count),
+    outage: new Uint8Array(count),
+    dropP: new Float64Array(count),
+    mean: new Float64Array(count),
+    hit: new Float64Array(count),
+    childStart: new Int32Array(count + 1),
+    child: new Int32Array(0),
+    childParallel: new Uint8Array(0),
+  };
+  const child: number[] = [];
+  const parallel: number[] = [];
+  for (const [id, n] of g.nodes) {
+    const i = index.get(id)!;
+    s.childStart[i] = child.length;
+    const m = metrics[id];
+    if (!m) {
+      s.routing[i] = R_SKIP;
+      continue;
+    }
+    const routing = routingOf(n.kind);
+    s.routing[i] = routing === 'split' ? R_SPLIT : routing === 'async' ? R_ASYNC : R_FANOUT;
+    s.outage[i] = n.outage ? 1 : 0;
+    s.dropP[i] = m.lambda > 0 ? m.droppedRps / m.lambda : -1;
+    s.mean[i] = m.meanLatencyMs;
+    s.hit[i] = CACHING_KINDS.has(n.kind) ? n.hitRatio : -1;
+    for (const e of g.out.get(id) ?? []) {
+      child.push(index.get(nodeIdOf(e.to))!);
+      parallel.push(e.mode === 'parallel' ? 1 : 0);
+    }
+  }
+  // Map обходит узлы в порядке вставки, а index выдан в том же порядке: childStart монотонен.
+  s.childStart[count] = child.length;
+  s.child = Int32Array.from(child);
+  s.childParallel = Uint8Array.from(parallel);
+  return s;
+}
+
+/** Сэмплов по умолчанию, если схема укладывается в бюджет обхода. */
+export const DEFAULT_SAMPLES = 20_000;
+/** Меньше не берём: на p99 остаётся 20 сэмплов хвоста. */
+export const MIN_SAMPLES = 2_000;
+/** Сколько посещений узлов допускает один пересчёт: ≈ 40 мс при ≈ 40 нс на посещение. */
+export const VISIT_BUDGET = 1_000_000;
+
+/**
+ * Сколько узлов в среднем обходит один сэмпл. Считается тем же проходом, что и поток в analyze,
+ * но по правилам sampleRequest: очередь не ждёт потребителей, кэш обрывает попадания.
+ * Отказы учитываются только как доля обслуженных, поэтому это оценка сверху.
+ */
+function visitsPerSample(s: Sampler, order: Int32Array, entries: Int32Array, readShare: number): number {
+  const count = s.routing.length;
+  const vr = new Float64Array(count);
+  const vw = new Float64Array(count);
+  for (const e of entries) {
+    vr[e]! += readShare / entries.length;
+    vw[e]! += (1 - readShare) / entries.length;
+  }
+  for (const i of order) {
+    if (s.outage[i] || s.routing[i] === R_ASYNC) continue;
+    const keep = s.dropP[i]! > 0 ? 1 - s.dropP[i]! : 1;
+    const r = vr[i]! * keep * (s.hit[i]! >= 0 ? 1 - s.hit[i]! : 1);
+    const w = vw[i]! * keep;
+    const from = s.childStart[i]!;
+    const n = s.childStart[i + 1]! - from;
+    const k = s.routing[i] === R_SPLIT ? 1 / n : 1;
+    for (let c = from; c < from + n; c++) {
+      vr[s.child[c]!]! += r * k;
+      vw[s.child[c]!]! += w * k;
+    }
+  }
+  let total = 0;
+  for (let i = 0; i < count; i++) total += vr[i]! + vw[i]!;
+  return total;
+}
+
+/**
+ * Число сэмплов по бюджету обхода. Сэмплов меньше там, где сэмпл длинный, и точность от этого
+ * не страдает: время такого запроса — сумма (или максимум) многих экспонент, и относительный
+ * разброс его перцентилей намного меньше, чем у короткого пути (замеры в docs/how-we-calculate.md).
+ */
+export function samplesFor(visits: number): number {
+  if (!(visits > 0)) return DEFAULT_SAMPLES;
+  return Math.max(MIN_SAMPLES, Math.min(DEFAULT_SAMPLES, Math.floor(VISIT_BUDGET / visits)));
+}
+
+/** Результат сэмпла «запрос получил ошибку». Время запроса не бывает отрицательным. */
+const FAILED = -1;
+
 /**
  * Монте-Карло: прогоняем сэмплы запросов по графу и собираем сквозные перцентили.
- * Возвращает время запроса или null, если запрос получил ошибку.
+ * Возвращает время запроса или FAILED, если запрос получил ошибку.
+ *
+ * Случайные числа берутся в том же порядке, что и в исходной рекурсии по Graph:
+ * монетка отказа (если у узла есть поток), время узла (если W > 0), попадание в кэш (чтение
+ * через кэш или CDN), выбор связи при split с несколькими связями. Поэтому сэмплы те же,
+ * что у прежней реализации, и перцентили совпадают бит в бит.
  */
-function sampleRequest(
-  id: string,
-  isRead: boolean,
-  g: Graph,
-  metrics: Record<string, NodeMetrics>,
-  rng: Rng,
-  depth: number,
-): number | null {
-  const n = g.nodes.get(id);
-  const m = metrics[id];
-  if (!n || !m || depth > 64) return 0;
-  if (n.outage) return null;
-  if (m.lambda > 0 && rng() < m.droppedRps / m.lambda) return null;
+function sampleRequest(i: number, isRead: boolean, s: Sampler, rng: Rng, depth: number): number {
+  const routing = s.routing[i]!;
+  if (routing === R_SKIP || depth > 64) return 0;
+  if (s.outage[i]) return FAILED;
+  const dropP = s.dropP[i]!;
+  if (dropP >= 0 && rng() < dropP) return FAILED;
 
-  let t = sampleExp(rng, m.meanLatencyMs);
+  // sampleExp, развёрнутый на месте: 1 - u, чтобы не получить ln(0).
+  const mean = s.mean[i]!;
+  let t = mean <= 0 ? 0 : -mean * Math.log(1 - rng());
 
-  if (CACHING_KINDS.has(n.kind) && isRead && rng() < n.hitRatio) return t;
-  const routing = routingOf(n.kind);
-  if (routing === 'async') return t;
+  const hit = s.hit[i]!;
+  if (hit >= 0 && isRead && rng() < hit) return t;
+  if (routing === R_ASYNC) return t;
 
-  const edges = g.out.get(id) ?? [];
-  if (edges.length === 0) return t;
+  const from = s.childStart[i]!;
+  const count = s.childStart[i + 1]! - from;
+  if (count === 0) return t;
 
   // split: запрос уходит ровно в одну связь, выбранную равновероятно.
   // При одной связи выбирать нечего: не тратим случайное число, чтобы не сдвигать поток сэмплов.
-  if (routing === 'split') {
-    const e = edges.length === 1 ? edges[0]! : edges[Math.floor(rng() * edges.length)]!;
-    const child = sampleRequest(nodeIdOf(e.to), isRead, g, metrics, rng, depth + 1);
-    return child === null ? null : t + child;
+  if (routing === R_SPLIT) {
+    const k = count === 1 ? 0 : Math.floor(rng() * count);
+    const c = sampleRequest(s.child[from + k]!, isRead, s, rng, depth + 1);
+    return c === FAILED ? FAILED : t + c;
   }
 
   let parallelMax = 0;
-  for (const e of edges) {
-    const child = sampleRequest(nodeIdOf(e.to), isRead, g, metrics, rng, depth + 1);
-    if (child === null) return null;
-    if (e.mode === 'parallel') parallelMax = Math.max(parallelMax, child);
-    else t += child;
+  for (let k = from; k < from + count; k++) {
+    const c = sampleRequest(s.child[k]!, isRead, s, rng, depth + 1);
+    if (c === FAILED) return FAILED;
+    if (s.childParallel[k]) parallelMax = Math.max(parallelMax, c);
+    else t += c;
   }
   return t + parallelMax;
 }
@@ -352,26 +474,39 @@ export function simulate(doc: LoadlineDocument, options: SimulateOptions): Simul
   const g = buildGraph(doc, options.presets, warnings);
   const { nodes, edges } = analyze(doc, g);
 
-  const samples = options.samples ?? 20_000;
   const rng = createRng(options.seed ?? 1);
   const readShare = doc.traffic.readShare ?? 1;
   const incoming = doc.traffic.rps * (doc.traffic.spike ?? 1);
 
-  const times: number[] = [];
+  let samples = 0;
+  // Float64Array: без упаковки чисел и без роста массива в горячем цикле.
+  let buffer = new Float64Array(0);
+  let ok = 0;
   let failed = 0;
   if (g.entries.length > 0 && incoming > 0) {
+    const index = new Map<string, number>();
+    for (const id of g.nodes.keys()) index.set(id, index.size);
+    const sampler = compileSampler(g, nodes, index);
+    const entries = Int32Array.from(g.entries, (id) => index.get(id)!);
+    const order = Int32Array.from(g.order, (id) => index.get(id)!);
+    samples = options.samples ?? samplesFor(visitsPerSample(sampler, order, entries, readShare));
+    buffer = new Float64Array(samples);
     for (let i = 0; i < samples; i++) {
-      const entry = g.entries[Math.floor(rng() * g.entries.length)]!;
-      const t = sampleRequest(entry, rng() < readShare, g, nodes, rng, 0);
-      if (t === null) failed++;
-      else times.push(t);
+      const entry = entries[Math.floor(rng() * entries.length)]!;
+      const t = sampleRequest(entry, rng() < readShare, sampler, rng, 0);
+      if (t === FAILED) failed++;
+      else buffer[ok++] = t;
     }
   }
-  times.sort((a, b) => a - b);
+  const times = buffer.subarray(0, ok);
 
-  const total = times.length + failed;
+  const total = ok + failed;
   const errorRate = total > 0 ? failed / total : 0;
-  const mean = times.length > 0 ? times.reduce((s, x) => s + x, 0) / times.length : 0;
+  let sum = 0;
+  for (let i = 0; i < ok; i++) sum += times[i]!;
+  const mean = ok > 0 ? sum / ok : 0;
+  // Полная сортировка не нужна: из выборки берём только три перцентиля.
+  const [p50, p95, p99] = percentilesOf(times, [0.5, 0.95, 0.99]) as [number, number, number];
 
   let bottleneckId: string | null = null;
   let maxRho = -1;
@@ -392,11 +527,12 @@ export function simulate(doc: LoadlineDocument, options: SimulateOptions): Simul
       servedRps: incoming * (1 - errorRate),
       errorRate,
       meanLatencyMs: mean,
-      p50Ms: percentileOfSorted(times, 0.5),
-      p95Ms: percentileOfSorted(times, 0.95),
-      p99Ms: percentileOfSorted(times, 0.99),
+      p50Ms: p50,
+      p95Ms: p95,
+      p99Ms: p99,
       costMonthlyUsd: Object.values(nodes).reduce((s, m) => s + m.costMonthlyUsd, 0),
       bottleneckId,
+      samples,
     },
   };
 }
