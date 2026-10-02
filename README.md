@@ -50,17 +50,38 @@ dotnet run --project src/Loadline.AppHost   # Postgres в Docker + API на :508
 
 Без Aspire: поднимите Postgres сами (`loadline/loadline`, база `loadline`) и запустите `dotnet run --project src/Loadline.Api`.
 
-## Первая миграция
+## Миграции базы
 
-Пока миграций нет, API в режиме Development создаёт таблицы через `EnsureCreated`. Перед первым деплоем:
+Миграции EF Core лежат в `server/src/Loadline.Data/Migrations`. API в режиме Development применяет их сам при старте. `dotnet-ef` закреплён в `server/dotnet-tools.json`, и его версия совпадает с EF Core.
 
 ```powershell
-dotnet tool install --global dotnet-ef
 cd server
-dotnet ef migrations add Initial -p src/Loadline.Data -s src/Loadline.Data
+dotnet tool restore
+dotnet tool run dotnet-ef migrations add <Имя> -p src/Loadline.Data -s src/Loadline.Data -o Migrations
 ```
 
-После этого API в Development применяет миграции сам, а в проде их нужно применять отдельным шагом деплоя.
+CI проверяет, что миграции покрывают модель (`has-pending-model-changes`).
+
+## Выкладка
+
+Фронт — статика на Cloudflare Pages, API и Postgres — на одном VPS за Caddy. Домены у них разные.
+
+**API.** `deploy/compose.yaml` поднимает Postgres, затем одноразовый сервис `migrate` (EF bundle из образа API), и только после него API и Caddy с TLS.
+
+```bash
+cp deploy/.env.example deploy/.env   # пароль Postgres, домен API, домен фронта
+docker compose -f deploy/compose.yaml --env-file deploy/.env up -d --build
+```
+
+`WEB_ORIGIN` попадает в `Cors:Origins` API: запросы принимаются только с домена фронта.
+
+**Фронт.** `.github/workflows/deploy-web.yml` собирает приложение и выкладывает его на Pages при пуше в `main`. Он ничего не делает, пока в настройках репозитория не заданы переменные `CF_PAGES_PROJECT` и `LOADLINE_API_URL` и секреты `CLOUDFLARE_API_TOKEN` и `CLOUDFLARE_ACCOUNT_ID`. Адрес API вшивается при сборке:
+
+```bash
+pnpm --filter @loadline/app build --define "LOADLINE_API_URL=\"'https://api.example.com'\""
+```
+
+Без него клиент ходит на тот же origin (`/api`). Если API недоступен, «Ссылка» делает ссылку со схемой внутри (ADR 0004).
 
 ## Генерация кода
 
@@ -84,12 +105,7 @@ dotnet ef migrations add Initial -p src/Loadline.Data -s src/Loadline.Data
 
 `http://localhost:4200/?fps` добавляет счётчик кадров и сценарий на 200 узлов: это замер плавности доски из ADR 0003.
 
-Пока нет:
-
-- настройки адреса API для прода, где фронт и API на разных доменах (см. ADR 0004);
-- миграций EF Core (см. выше).
-
-Версии пакетов в `server/Directory.Packages.props` плавающие в пределах мажорной; зафиксируйте точные, когда сборка устоится.
+Версии NuGet-пакетов в `server/Directory.Packages.props` точные, версии npm — в `web/pnpm-lock.yaml`.
 
 ## Лицензия
 

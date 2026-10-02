@@ -2,6 +2,7 @@ import { DestroyRef, Injectable, effect, inject, untracked } from '@angular/core
 import { ApiError, LoadlineApi } from '@loadline/api-client';
 import { parseDocument } from '@loadline/engine';
 import type { LoadlineDocument } from '@loadline/model';
+import { API_BASE_URL } from '../config/api-url';
 import { EditorStore } from '../editor/editor-store';
 import { MAX_DECODED_BYTES, decodeDoc, encodeDoc } from './link-codec';
 
@@ -54,7 +55,7 @@ export function fileNameFor(doc: LoadlineDocument): string {
 @Injectable({ providedIn: 'root' })
 export class PersistenceService {
   private readonly store = inject(EditorStore);
-  private readonly api = new LoadlineApi();
+  private readonly api = new LoadlineApi({ baseUrl: API_BASE_URL });
   private warnedQuota = false;
 
   constructor() {

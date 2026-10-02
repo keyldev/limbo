@@ -19,14 +19,29 @@ services:
       interval: 10s
       retries: 5
 
+  # Миграции базы: одноразовый запуск EF bundle из образа API, до старта самого API.
+  migrate:
+    image: loadline-api
+    build:
+      context: ..
+      dockerfile: deploy/api.Dockerfile
+    entrypoint: ["./efbundle"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__loadline: Host=postgres;Database=loadline;Username=loadline;Password=${POSTGRES_PASSWORD}
+
   api:
+    image: loadline-api
     build:
       context: ..
       dockerfile: deploy/api.Dockerfile
     restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__loadline: Host=postgres;Database=loadline;Username=loadline;Password=${POSTGRES_PASSWORD}

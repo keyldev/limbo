@@ -1,0 +1,53 @@
+name: Деплой фронта
+
+# Фронт — статика на Cloudflare Pages, API — на своём домене (ADR 0004, deploy/compose.yaml).
+# Workflow ничего не делает, пока в настройках репозитория не заданы:
+#   Variables: CF_PAGES_PROJECT — имя проекта Pages, LOADLINE_API_URL — адрес API, например https://api.loadline.dev
+#   Secrets:   CLOUDFLARE_API_TOKEN (право Cloudflare Pages: Edit), CLOUDFLARE_ACCOUNT_ID
+# Домен фронта затем прописывается в WEB_ORIGIN (deploy/.env) — это Cors:Origins API.
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', 'spec/**', '.github/workflows/deploy-web.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Cloudflare Pages
+    if: vars.CF_PAGES_PROJECT != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
+      - name: Сборка с адресом API
+        env:
+          LOADLINE_API_URL: ${{ vars.LOADLINE_API_URL }}
+        run: |
+          pnpm --filter "@loadline/app^..." build
+          pnpm --filter @loadline/app build --define "LOADLINE_API_URL=\"'${LOADLINE_API_URL}'\""
+
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy web/app/dist/app/browser --project-name=${{ vars.CF_PAGES_PROJECT }} --branch=main

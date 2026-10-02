@@ -68,19 +68,10 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 
-    // В разработке применяем миграции при старте. В проде — отдельным шагом деплоя.
-    // Пока первой миграции нет, создаём схему базы напрямую (см. README, «Первая миграция»).
+    // В разработке применяем миграции при старте. В проде — отдельным шагом деплоя:
+    // сервис migrate в deploy/compose.yaml запускает EF bundle до старта API.
     await using var scope = app.Services.CreateAsyncScope();
-    var db = scope.ServiceProvider.GetRequiredService<LoadlineDbContext>();
-    if (db.Database.GetMigrations().Any())
-    {
-        await db.Database.MigrateAsync();
-    }
-    else
-    {
-        app.Logger.LogWarning("Миграций нет: схема базы создана через EnsureCreated. Создайте первую миграцию.");
-        await db.Database.EnsureCreatedAsync();
-    }
+    await scope.ServiceProvider.GetRequiredService<LoadlineDbContext>().Database.MigrateAsync();
 }
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });

@@ -55,6 +55,10 @@ jobs:
       - name: OpenAPI совпадает с закоммиченным
         run: git diff --exit-code -- src/Loadline.Api/openapi
 
+      - run: dotnet tool restore
+      - name: Миграции EF Core покрывают модель
+        run: dotnet tool run dotnet-ef migrations has-pending-model-changes -p src/Loadline.Data -s src/Loadline.Data --no-build --configuration Release
+
   docker:
     name: Образ API собирается
     runs-on: ubuntu-latest

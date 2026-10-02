@@ -4,8 +4,9 @@ using Microsoft.EntityFrameworkCore.Design;
 namespace Loadline.Data;
 
 /// <summary>
-/// Нужна только инструменту dotnet ef для миграций:
-///   dotnet ef migrations add Initial -p src/Loadline.Data -s src/Loadline.Data
+/// Нужна инструменту dotnet ef и бандлу миграций (efbundle в образе API):
+///   dotnet ef migrations add &lt;Имя&gt; -p src/Loadline.Data -s src/Loadline.Data -o Migrations
+/// Строку подключения бандл берёт из ConnectionStrings__loadline.
 /// </summary>
 public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<LoadlineDbContext>
 {

@@ -1,0 +1,10 @@
+# Образу API нужны только spec/ и server/. Остальное не отправляем в контекст сборки.
+.git
+.github
+.claude
+web
+docs
+deploy/.env
+**/bin
+**/obj
+**/node_modules
