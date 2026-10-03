@@ -4,7 +4,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import type { LoadlineDocument, Preset } from '@loadline/model';
 import { migrate } from './migrate.js';
-import { simulate } from './simulate.js';
+import { DEFAULT_SAMPLES, MIN_SAMPLES, simulate } from './simulate.js';
 
 const SPEC = resolve(__dirname, '../../../../spec');
 const presets = (JSON.parse(readFileSync(join(SPEC, 'presets/default.json'), 'utf8')) as { presets: Preset[] })
@@ -209,6 +209,41 @@ describe('маршрутизация потока', () => {
     const r = simulate(doc([at('c', 'client'), at('a', 'service'), at('lonely', 'nosql')], [['c', 'a']]), opts);
     expect(r.nodes['lonely']!.status).toBe('idle');
     expect(r.system.bottleneckId).toBe('a');
+  });
+});
+
+describe('число сэмплов', () => {
+  /** client → сервис → layers слоёв по width сервисов, каждый зовёт весь следующий слой: путей 3^layers. */
+  const lattice = (layers: number, width: number): LoadlineDocument => {
+    const nodes: LoadlineDocument['nodes'] = [{ id: 'c', kind: 'client', pos: { x: 0, y: 0 } }];
+    const edges: LoadlineDocument['edges'] = [];
+    let prev = ['c'];
+    for (let l = 0; l < layers; l++) {
+      const layer = Array.from({ length: l === 0 ? 1 : width }, (_, i) => `s${l}-${i}`);
+      for (const id of layer) nodes.push({ id, kind: 'service', pos: { x: 0, y: 0 }, params: { replicas: 500 } });
+      for (const a of prev) for (const b of layer) edges.push({ id: `${a}-${b}`, from: `${a}:out`, to: `${b}:in` });
+      prev = layer;
+    }
+    return { format: 'loadline', version: 1, traffic: { rps: 100, readShare: 1 }, nodes, edges };
+  };
+
+  it('короткие пути считаются полными 20 000 сэмплов', () => {
+    expect(simulate(chain(100, 2, 0.5), { presets }).system.samples).toBe(DEFAULT_SAMPLES);
+  });
+
+  it('длинные пути — меньше сэмплов, перцентили в пределах 2% от полного прогона', () => {
+    const doc = lattice(6, 3); // 365 узлов на сэмпл
+    const fast = simulate(doc, { presets }).system;
+    const full = simulate(doc, { presets, samples: DEFAULT_SAMPLES }).system;
+    expect(fast.samples).toBeLessThan(DEFAULT_SAMPLES);
+    expect(fast.samples).toBeGreaterThanOrEqual(MIN_SAMPLES);
+    for (const key of ['meanLatencyMs', 'p50Ms', 'p95Ms', 'p99Ms'] as const) {
+      expect(Math.abs(fast[key] / full[key] - 1)).toBeLessThan(0.02);
+    }
+  });
+
+  it('явное число сэмплов не меняется', () => {
+    expect(simulate(lattice(6, 3), { presets, samples: 123 }).system.samples).toBe(123);
   });
 });
 
