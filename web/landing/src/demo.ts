@@ -41,6 +41,9 @@ function replicasWord(n: number): string {
   return `${n} реплик`;
 }
 
+/** Период бега точек по связи: 50 rps — около 2 с, 20k rps — около 0,6 с. */
+const flowSeconds = (rps: number): number => Math.min(2.4, Math.max(0.5, 3.2 - 0.6 * Math.log10(Math.max(rps, 1))));
+
 /** Узлы цепочки по порядку: id в сценарии и подписи. */
 const CHAIN = [
   { id: 'client', name: 'Пользователи', kind: 'клиенты' },
@@ -95,20 +98,20 @@ function mount(root: HTMLElement): void {
 
   // Разметка цепочки: узел, связь с потоком, узел…
   const nodeEls = new Map<string, { card: HTMLElement; load: HTMLElement; bar: HTMLElement; sub: HTMLElement }>();
-  const edgeEls: HTMLElement[] = [];
+  const edgeEls: { wire: HTMLElement; rps: HTMLElement }[] = [];
   CHAIN.forEach((c, i) => {
     if (i > 0) {
       const wire = document.createElement('div');
       wire.className = 'wire';
       wire.innerHTML = '<span class="wire-rps"></span>';
       chain.append(wire);
-      edgeEls.push(wire.firstElementChild as HTMLElement);
+      edgeEls.push({ wire, rps: wire.firstElementChild as HTMLElement });
     }
     const card = document.createElement('div');
-    card.className = 'node';
+    card.className = c.id === 'client' ? 'node node-client' : 'node';
     card.innerHTML = `
-      <div class="node-name">${c.name}</div>
-      <div class="node-kind">${c.kind}<span class="node-sub"></span></div>
+      <div class="node-kind">${c.kind}</div>
+      <div class="node-name">${c.name}<span class="node-sub"></span></div>
       ${c.id === 'client' ? '<div class="node-load"></div>' : '<div class="node-load"></div><div class="bar"><span></span></div>'}`;
     chain.append(card);
     nodeEls.set(c.id, {
@@ -156,11 +159,17 @@ function mount(root: HTMLElement): void {
       el.load.textContent = c.id === 'client' ? `${fmt(m.lambda)} rps` : `${Math.round(m.rho * 100)}%`;
       el.bar.style.width = `${Math.min(100, m.rho * 100)}%`;
       el.sub.textContent =
-        c.id === 'api' ? ` · ×${state.replicas}` : c.id === 'cache' ? ` · hit ${Math.round(state.hit * 100)}%` : '';
+        c.id === 'api' ? ` ×${state.replicas}` : c.id === 'cache' ? ` · ${Math.round(state.hit * 100)}%` : '';
     }
+    // Точки-запросы бегут тем быстрее, чем больше поток; цвет связи — состояние узла, куда она ведёт.
     base.edges.forEach((e, i) => {
       const el = edgeEls[i];
-      if (el) el.textContent = `${fmt(r.edges[e.id]?.rps ?? 0)} rps`;
+      if (!el) return;
+      const rps = r.edges[e.id]?.rps ?? 0;
+      el.rps.textContent = `${fmt(rps)} rps`;
+      el.wire.dataset['flow'] = rps > 0 ? '1' : '0';
+      el.wire.style.setProperty('--dur', `${flowSeconds(rps).toFixed(2)}s`);
+      el.wire.dataset['status'] = r.nodes[e.to.split(':')[0]!]?.status ?? 'ok';
     });
 
     const { system } = r;

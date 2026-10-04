@@ -8,8 +8,13 @@
   <meta property="og:title" content="Loadline — draw.io, который умеет считать">
   <meta property="og:description" content="Тренажёр system design: соберите схему, дайте нагрузку и увидите, что сломается первым.">
   <meta property="og:type" content="website">
-  <meta name="color-scheme" content="dark light">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#141517" media="(prefers-color-scheme: dark)">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@1,8..60,400;1,8..60,500&family=JetBrains+Mono:wght@400;500;600&display=swap">
   <link rel="stylesheet" href="landing.css">
   <script>
     // Ссылки на схемы раньше жили на корне (/#s=…, /#doc=…). Теперь доска на /app/ — переносим их туда.
@@ -30,80 +35,94 @@
         Loadline
       </a>
       <nav class="nav" aria-label="Разделы">
-        <a href="#scenarios">Сценарии</a>
-        <a href="#model">Модель</a>
+        <a class="nav-link" href="#how">Как это работает</a>
+        <a class="nav-link" href="#scenarios">Сценарии</a>
+        <a class="nav-link" href="#model">Модель</a>
         <a class="btn btn-sm" href="/app/">Открыть доску</a>
       </nav>
     </div>
   </header>
 
   <main>
-    <section class="hero wrap">
-      <div class="hero-text">
-        <p class="eyebrow">Тренажёр system design в браузере</p>
-        <h1>Нарисуйте архитектуру — и&nbsp;прогоните её под нагрузкой</h1>
-        <p class="lead">
-          На собеседовании мало сказать «тут поставим кэш». В Loadline вы собираете схему,
-          выкручиваете трафик и видите, что сломается первым, какие у запросов p95 и p99
-          и сколько всё это стоит в месяц.
-        </p>
-        <div class="cta">
-          <a class="btn" href="/app/">Открыть доску</a>
-          <a class="btn btn-ghost" href="/app/#scenario=news-feed">Разобрать ленту новостей</a>
-        </div>
-        <p class="fine">Без регистрации · работает в браузере · открытый код, MIT</p>
-      </div>
-
-      <figure class="demo" id="demo" aria-labelledby="demo-cap">
-        <figcaption id="demo-cap" class="demo-head">
-          <span class="demo-title">Сокращатель ссылок</span>
-          <span class="demo-note">живой движок, тот же, что на доске</span>
-        </figcaption>
-        <div class="chain" data-chain></div>
-        <div class="controls">
-          <label class="ctl">
-            <span>Трафик <b data-out="rps"></b></span>
-            <input type="range" min="0" max="1000" step="1" data-in="rps" aria-label="Трафик, запросов в секунду">
-          </label>
-          <label class="ctl">
-            <span>Hit ratio кэша <b data-out="hit"></b></span>
-            <input type="range" min="0" max="99" step="1" data-in="hit" aria-label="Доля попаданий в кэш, процентов">
-          </label>
-          <div class="ctl">
-            <span>Реплики API <b data-out="replicas"></b></span>
-            <div class="stepper">
-              <button type="button" data-step="-1" aria-label="Убрать реплику">−</button>
-              <button type="button" data-step="1" aria-label="Добавить реплику">+</button>
-            </div>
+    <section class="hero">
+      <div class="wrap">
+        <div class="hero-text">
+          <p class="eyebrow"><span class="dot" aria-hidden="true"></span>Тренажёр system design · открытый код</p>
+          <h1>Нарисуйте архитектуру —<br>и&nbsp;<em>прогоните её под&nbsp;нагрузкой</em></h1>
+          <p class="lead">
+            На собеседовании мало сказать «тут поставим кэш». Соберите схему, выкрутите трафик
+            и посмотрите, что сломается первым, какие у запросов p95 и p99 и сколько всё это стоит в месяц.
+          </p>
+          <div class="cta">
+            <a class="btn btn-lg" href="/app/">Открыть доску <span aria-hidden="true">→</span></a>
+            <a class="btn btn-lg btn-ghost" href="/app/#scenario=news-feed">Разобрать ленту новостей</a>
           </div>
+          <p class="fine">Без регистрации · работает в браузере · MIT</p>
         </div>
-        <dl class="metrics">
-          <div><dt>p99</dt><dd data-m="p99"></dd></div>
-          <div><dt>Ошибки</dt><dd data-m="err"></dd></div>
-          <div><dt>В месяц</dt><dd data-m="cost"></dd></div>
-          <div><dt>Узкое место</dt><dd data-m="neck"></dd></div>
-        </dl>
-        <p class="demo-hint" data-hint>Поднимите трафик до 6k rps и посмотрите, кто сдастся первым.</p>
-        <noscript><p class="demo-hint">Демо работает на JavaScript. Доска — по кнопке «Открыть доску».</p></noscript>
-      </figure>
+
+        <figure class="board" id="demo" aria-labelledby="demo-cap">
+          <figcaption class="board-head">
+            <span class="file" id="demo-cap">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+              url-shortener.loadline.json
+            </span>
+            <span class="live"><span class="pulse" aria-hidden="true"></span>живой движок — тот же, что на доске</span>
+          </figcaption>
+
+          <div class="canvas">
+            <div class="chain" data-chain></div>
+          </div>
+
+          <div class="board-foot">
+            <div class="controls">
+              <label class="ctl">
+                <span class="ctl-head">Трафик <b data-out="rps"></b></span>
+                <input type="range" min="0" max="1000" step="1" data-in="rps" aria-label="Трафик, запросов в секунду">
+              </label>
+              <label class="ctl">
+                <span class="ctl-head">Hit ratio кэша <b data-out="hit"></b></span>
+                <input type="range" min="0" max="99" step="1" data-in="hit" aria-label="Доля попаданий в кэш, процентов">
+              </label>
+              <div class="ctl">
+                <span class="ctl-head">Реплики API <b data-out="replicas"></b></span>
+                <div class="stepper">
+                  <button type="button" data-step="-1" aria-label="Убрать реплику">−</button>
+                  <button type="button" data-step="1" aria-label="Добавить реплику">+</button>
+                </div>
+              </div>
+            </div>
+            <dl class="metrics">
+              <div><dt>p99</dt><dd data-m="p99"></dd></div>
+              <div><dt>Ошибки</dt><dd data-m="err"></dd></div>
+              <div><dt>В месяц</dt><dd data-m="cost"></dd></div>
+              <div><dt>Узкое место</dt><dd data-m="neck"></dd></div>
+            </dl>
+            <p class="hint" data-hint aria-live="polite">Поднимите трафик до 6k rps и посмотрите, кто сдастся первым.</p>
+            <noscript><p class="hint">Демо работает на JavaScript. Доска — по кнопке «Открыть доску».</p></noscript>
+          </div>
+        </figure>
+      </div>
     </section>
 
-    <section class="band">
+    <section class="section" id="how">
       <div class="wrap">
-        <h2>Как готовиться с Loadline</h2>
+        <header class="section-head">
+          <p class="kicker">Как это работает</p>
+          <h2>Три шага от&nbsp;стрелочек к&nbsp;<em>цифрам</em></h2>
+        </header>
         <ol class="steps">
           <li>
-            <span class="num">1</span>
+            <span class="num">01</span>
             <h3>Соберите схему</h3>
             <p>13 компонентов: CDN, балансировщик, API-шлюз, сервисы и воркеры, кэш, SQL и реплики, NoSQL, очередь, хранилище, поиск. Перетащите на доску и соедините порт в порт.</p>
           </li>
           <li>
-            <span class="num">2</span>
+            <span class="num">02</span>
             <h3>Дайте нагрузку</h3>
-            <p>Ползунок трафика от 50 до 20 000 rps, всплеск ×4 на 8 секунд, отказ любого узла одним тумблером. Чтения и записи можно пустить разными путями.</p>
+            <p>Трафик от 50 до 20 000 rps, всплеск ×4 на 8 секунд, отказ любого узла одним тумблером. Чтения и записи можно пустить разными путями.</p>
           </li>
           <li>
-            <span class="num">3</span>
+            <span class="num">03</span>
             <h3>Объясните цифры</h3>
             <p>У каждого узла есть «Как посчитано»: формула и подставленные числа. Именно об этом спросит интервьюер — почему здесь очередь и сколько нужно реплик.</p>
           </li>
@@ -111,45 +130,61 @@
       </div>
     </section>
 
-    <section class="wrap" id="scenarios">
-      <h2>Учебные сценарии</h2>
-      <p class="sub">Классические задачи с собеседований. Каждая открывается на доске в один клик, дальше её можно ломать и чинить.</p>
-      <div class="cards">
-        <a class="card" href="/app/#scenario=url-shortener">
-          <h3>Сокращатель ссылок</h3>
-          <p>90% чтений, кэш перед SQL. Сколько реплик выдержат 2k rps и что будет, если hit ratio упадёт до 50%.</p>
-          <span class="go">Открыть →</span>
-        </a>
-        <a class="card" href="/app/#scenario=news-feed">
-          <h3>Лента новостей</h3>
-          <p>Чтения и публикации разными путями: кэш ленты, fan-out на чтение, очередь на запись. Кто не выдержит, когда кэш промахивается.</p>
-          <span class="go">Открыть →</span>
-        </a>
-        <a class="card" href="/app/#scenario=chat">
-          <h3>Чат</h3>
-          <p>Сообщение параллельно пишется в историю и в очередь доставки. Почему растёт backlog, а клиент этого не видит.</p>
-          <span class="go">Открыть →</span>
-        </a>
-        <a class="card" href="/app/#scenario=telemetry">
-          <h3>Телеметрия</h3>
-          <p>3k rps одних записей, одна очередь и два набора воркеров. Индексатор отстаёт — найдите, на сколько и что с этим делать.</p>
-          <span class="go">Открыть →</span>
-        </a>
-        <a class="card" href="/app/#scenario=web-app">
-          <h3>Веб-приложение</h3>
-          <p>CDN, балансировщик, две копии API, общий кэш и очередь событий. Хорошая отправная точка для своей схемы.</p>
-          <span class="go">Открыть →</span>
-        </a>
+    <section class="section section-alt" id="scenarios">
+      <div class="wrap">
+        <header class="section-head">
+          <p class="kicker">Учебные сценарии</p>
+          <h2>Классика с&nbsp;собеседований, которую <em>можно сломать</em></h2>
+          <p class="sub">Каждая задача открывается на доске в один клик. Дальше её можно ломать и чинить.</p>
+        </header>
+        <div class="cards">
+          <a class="card" href="/app/#scenario=url-shortener">
+            <div class="tags"><span>90% чтений</span><span>кэш</span><span>SQL</span></div>
+            <h3>Сокращатель ссылок</h3>
+            <p>Сколько реплик выдержат 2k rps и что будет, если hit ratio упадёт до 50%.</p>
+            <span class="go">Открыть <span aria-hidden="true">→</span></span>
+          </a>
+          <a class="card" href="/app/#scenario=news-feed">
+            <div class="tags"><span>fan-out</span><span>очередь</span><span>чтения ≠ записи</span></div>
+            <h3>Лента новостей</h3>
+            <p>Чтения идут через кэш ленты, публикации через очередь. Кто не выдержит, когда кэш промахивается.</p>
+            <span class="go">Открыть <span aria-hidden="true">→</span></span>
+          </a>
+          <a class="card" href="/app/#scenario=chat">
+            <div class="tags"><span>параллельно</span><span>backlog</span></div>
+            <h3>Чат</h3>
+            <p>Сообщение параллельно пишется в историю и в очередь доставки. Почему растёт backlog, а клиент этого не видит.</p>
+            <span class="go">Открыть <span aria-hidden="true">→</span></span>
+          </a>
+          <a class="card" href="/app/#scenario=telemetry">
+            <div class="tags"><span>3k rps записей</span><span>воркеры</span></div>
+            <h3>Телеметрия</h3>
+            <p>Одна очередь и два набора воркеров. Индексатор отстаёт — найдите, на сколько и что с этим делать.</p>
+            <span class="go">Открыть <span aria-hidden="true">→</span></span>
+          </a>
+          <a class="card" href="/app/#scenario=web-app">
+            <div class="tags"><span>CDN</span><span>балансер</span><span>кэш</span></div>
+            <h3>Веб-приложение</h3>
+            <p>Две копии API, общий кэш и очередь событий. Хорошая отправная точка для своей схемы.</p>
+            <span class="go">Открыть <span aria-hidden="true">→</span></span>
+          </a>
+          <a class="card card-blank" href="/app/">
+            <div class="tags"><span>своя задача</span></div>
+            <h3>Пустая доска</h3>
+            <p>Возьмите вопрос с последнего собеседования и проверьте свой ответ под нагрузкой.</p>
+            <span class="go">Начать <span aria-hidden="true">→</span></span>
+          </a>
+        </div>
       </div>
     </section>
 
-    <section class="band" id="model">
+    <section class="section" id="model">
       <div class="wrap model">
-        <div>
-          <h2>Модель открыта</h2>
+        <div class="model-text">
+          <p class="kicker">Модель открыта</p>
+          <h2>Цифрам можно верить, когда видно, <em>откуда они</em></h2>
           <p class="sub">
-            Цифрам можно верить ровно настолько, насколько понятно, откуда они взялись.
-            Поэтому формулы не прячутся: каждый узел показывает расчёт, а движок — открытый код
+            Формулы не прячутся: каждый узел показывает расчёт, а движок — открытый код
             с тестами на эталонных сценариях.
           </p>
           <h3 class="limits-title">Чего модель пока не умеет</h3>
@@ -159,31 +194,58 @@
             <li>Циклы в схеме не считаются: редактор не даёт их создать.</li>
           </ul>
         </div>
-        <div class="formulas" role="list">
+        <div class="sheet" role="list" aria-label="Формулы модели">
           <div class="f" role="listitem"><code>ρ = λ / (c · μ)</code><span>загрузка узла: поток делить на ёмкость реплик</span></div>
           <div class="f" role="listitem"><code>W = t₀ / (1 − ρ)</code><span>время ответа растёт, когда загрузка подходит к 100%</span></div>
           <div class="f" role="listitem"><code>ρ ≥ 1 → ошибки</code><span>лишний поток отклоняется, а за очередью копится в backlog</span></div>
-          <div class="f" role="listitem"><code>p99 ← 20 000 запросов</code><span>сквозные перцентили считает Монте-Карло по графу</span></div>
+          <div class="f" role="listitem"><code>p99 ← Монте-Карло</code><span>сквозные перцентили по тысячам запросов через граф</span></div>
         </div>
       </div>
     </section>
 
-    <section class="wrap features">
-      <div><h3>Ничего не теряется</h3><p>Схема автосохраняется в браузере. Её можно выгрузить файлом <code>.loadline.json</code> и открыть снова.</p></div>
-      <div><h3>Ссылка на схему</h3><p>Отправьте схему ментору или напарнику по подготовке: ссылка открывает её на доске.</p></div>
-      <div><h3>Без аккаунта</h3><p>Не нужно ни регистрироваться, ни ставить: всё считается прямо в браузере.</p></div>
+    <section class="section section-alt">
+      <div class="wrap features">
+        <div class="feature">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg>
+          <h3>Ничего не теряется</h3>
+          <p>Схема автосохраняется в браузере. Её можно выгрузить файлом <code>.loadline.json</code> и открыть снова.</p>
+        </div>
+        <div class="feature">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+          <h3>Ссылка на схему</h3>
+          <p>Отправьте схему ментору или напарнику по подготовке: ссылка открывает её на доске.</p>
+        </div>
+        <div class="feature">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <h3>Без аккаунта</h3>
+          <p>Не нужно ни регистрироваться, ни ставить: всё считается прямо в браузере.</p>
+        </div>
+      </div>
     </section>
 
-    <section class="wrap final">
-      <h2>Попробуйте на своей задаче</h2>
-      <p class="sub">Возьмите вопрос с последнего собеседования и проверьте свой ответ под нагрузкой.</p>
-      <a class="btn" href="/app/">Открыть доску</a>
+    <section class="final">
+      <div class="wrap">
+        <div class="final-card">
+          <h2>Проверьте свой ответ <em>под&nbsp;нагрузкой</em></h2>
+          <p class="sub">Пять готовых задач, тринадцать компонентов и формулы, которые не стыдно показать интервьюеру.</p>
+          <a class="btn btn-lg" href="/app/">Открыть доску <span aria-hidden="true">→</span></a>
+        </div>
+      </div>
     </section>
   </main>
 
   <footer class="foot">
     <div class="wrap foot-in">
-      <span>Loadline · открытый код, лицензия MIT</span>
+      <span class="brand brand-sm">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <circle cx="5" cy="12" r="2.5" />
+          <circle cx="19" cy="6" r="2.5" />
+          <circle cx="19" cy="18" r="2.5" />
+          <path d="M7.5 12c5 0 5-6 9-6M7.5 12c5 0 5 6 9 6" />
+        </svg>
+        Loadline
+      </span>
+      <span class="foot-note">draw.io, который умеет считать · открытый код, MIT</span>
       <a href="/app/">Доска</a>
     </div>
   </footer>
