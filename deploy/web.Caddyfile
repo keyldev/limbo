@@ -1,0 +1,26 @@
+# Статика фронта внутри образа. TLS и домен — у прокси перед ним.
+{
+	auto_https off
+	admin off
+}
+
+:8080 {
+	encode zstd gzip
+	root * /srv
+
+	# Файлы Angular с хешем в имени не меняются никогда.
+	@hashed path_regexp -[A-Z0-9]{8}\.(js|css)$
+	header @hashed Cache-Control "public, max-age=31536000, immutable"
+
+	redir /app /app/ 308
+
+	handle /app/* {
+		try_files {path} /app/index.html
+		file_server
+	}
+
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}

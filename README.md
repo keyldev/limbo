@@ -118,6 +118,27 @@ pnpm --filter @loadline/app build --define "LOADLINE_API_URL=\"'https://api.exam
 
 Without it the client calls the same origin (`/api`). If the API is unavailable, Share makes a link with the diagram inside (ADR 0004).
 
+**Behind an existing reverse proxy.** If the machine already runs Caddy, nginx or Traefik on 80/443, use `deploy/compose.behind-proxy.yaml`: no ports and no Caddy of its own, and the frontend is a container too. `limbo-web` and `limbo-api` join the proxy's external network (`PROXY_NETWORK`, `edge` by default), and the proxy sends one domain to them: `/api/*` to `limbo-api:8080`, everything else to `limbo-web:8080`. The frontend and the API share a domain, so no API URL is baked in.
+
+```bash
+docker network create edge
+cp deploy/.env.example deploy/.env   # Postgres password, WEB_ORIGIN=https://<your domain>
+docker compose -f deploy/compose.behind-proxy.yaml --env-file deploy/.env up -d --build
+```
+
+For Caddy:
+
+```caddyfile
+limbo.example.com {
+	handle /api/* {
+		reverse_proxy limbo-api:8080
+	}
+	handle {
+		reverse_proxy limbo-web:8080
+	}
+}
+```
+
 ## Code generation
 
 | Command | What it does |

@@ -1,0 +1,9 @@
+# Образу фронта нужны только spec/ и web/ без сборок и зависимостей.
+**
+!spec/
+!web/
+!deploy/web.Caddyfile
+**/node_modules
+**/dist
+**/.angular
+web/app/public/spec

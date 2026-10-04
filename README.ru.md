@@ -103,6 +103,27 @@ pnpm --filter @loadline/app build --define "LOADLINE_API_URL=\"'https://api.exam
 
 Без него клиент ходит на тот же origin (`/api`). Если API недоступен, «Ссылка» делает ссылку со схемой внутри (ADR 0004).
 
+**За готовым прокси.** Если на машине уже стоит Caddy, nginx или Traefik на 80/443, берите `deploy/compose.behind-proxy.yaml`: своих портов и своего Caddy нет, фронт тоже в контейнере. `limbo-web` и `limbo-api` входят во внешнюю сеть прокси (`PROXY_NETWORK`, по умолчанию `edge`), а прокси отправляет туда один домен: `/api/*` в `limbo-api:8080`, остальное в `limbo-web:8080`. Фронт и API на одном домене, поэтому адрес API не вшивается.
+
+```bash
+docker network create edge
+cp deploy/.env.example deploy/.env   # пароль Postgres, WEB_ORIGIN=https://<ваш домен>
+docker compose -f deploy/compose.behind-proxy.yaml --env-file deploy/.env up -d --build
+```
+
+Для Caddy:
+
+```caddyfile
+limbo.example.com {
+	handle /api/* {
+		reverse_proxy limbo-api:8080
+	}
+	handle {
+		reverse_proxy limbo-web:8080
+	}
+}
+```
+
 ## Генерация кода
 
 | Команда | Что делает |
