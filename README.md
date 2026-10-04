@@ -1,8 +1,10 @@
-# Loadline
+# limbo
 
 **English** · [Русский](README.ru.md)
 
 A whiteboard where you draw an architecture and immediately run it under load: draw.io that can do the math.
+
+![News feed under 7.7k rps: three nodes are over capacity, the queue builds a backlog](docs/screenshots/board-closeup-dark.png)
 
 Build a diagram from clients, load balancers, services, caches, databases and queues, turn up the traffic and see what breaks first, what p95 and p99 latencies your requests get and how much it all costs per month. It's made for practicing system design interviews, but works for any back-of-the-envelope capacity check.
 
@@ -19,10 +21,20 @@ Stack: Angular 22 on the client, .NET 10 on the server. The simulation engine ru
 
 The UI is in Russian for now; translations are welcome.
 
+## Screenshots
+
+The news feed under load: the bottleneck, errors, p99 and cost in the header, nodes sorted by load on the right, overloads in the event log.
+
+![The board in dark theme with an overloaded news feed](docs/screenshots/board-overload-dark.png)
+
+Light theme, a worker selected: replicas, capacity and latency are editable, and "How it's calculated" shows the formulas with the actual numbers.
+
+![The board in light theme with the node inspector open](docs/screenshots/board-inspector-light.png)
+
 ## Repository layout
 
 ```
-loadline/
+limbo/
 ├─ spec/                     single source of truth: JSON Schema, presets, golden scenarios
 ├─ web/                      pnpm workspace
 │  ├─ packages/engine/       simulation engine, plain TS
