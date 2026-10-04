@@ -131,7 +131,7 @@ export class PersistenceService {
 
   async importFile(file: File): Promise<LoadlineDocument> {
     if (file.size > MAX_DECODED_BYTES)
-      throw new Error('Файл больше 256 КБ — это не похоже на схему Loadline');
+      throw new Error('Файл больше 256 КБ — это не похоже на схему limbo');
     let raw: unknown;
     try {
       raw = JSON.parse(await file.text());

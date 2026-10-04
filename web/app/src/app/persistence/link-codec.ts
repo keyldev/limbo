@@ -69,7 +69,7 @@ export async function encodeDoc(doc: unknown): Promise<string> {
 
 export async function decodeDoc(data: string): Promise<unknown> {
   if (!data.startsWith(PREFIX))
-    throw new Error('Ссылка из более новой версии Loadline или повреждена');
+    throw new Error('Ссылка из более новой версии limbo или повреждена');
   const packed = fromBase64Url(data.slice(PREFIX.length));
   let bytes: Uint8Array;
   try {

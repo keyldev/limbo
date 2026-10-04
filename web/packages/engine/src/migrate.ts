@@ -13,7 +13,7 @@ export class UnsupportedFormatError extends Error {
  */
 export function migrate(input: unknown): LoadlineDocument {
   if (typeof input !== 'object' || input === null) {
-    throw new UnsupportedFormatError('Это не файл Loadline');
+    throw new UnsupportedFormatError('Это не файл limbo');
   }
   const doc = input as { format?: unknown; version?: unknown };
   if (doc.format !== 'loadline') {
