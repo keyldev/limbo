@@ -144,6 +144,29 @@
     <button
       type="button"
       class="btn"
+      (click)="openImporter()"
+      title="Собрать схему из docker-compose, Caddyfile или nginx.conf"
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 14 14"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <rect x="1.5" y="1.5" width="4" height="4" rx="1" />
+        <rect x="8.5" y="8.5" width="4" height="4" rx="1" />
+        <path d="M5.5 3.5h3a2 2 0 0 1 2 2v3" />
+      </svg>
+      Импорт
+    </button>
+    <button
+      type="button"
+      class="btn"
       (click)="exportFile()"
       title="Сохранить схему файлом .loadline.json"
     >
@@ -246,3 +269,13 @@
 </main>
 
 <ll-share-dialog [state]="share()" (closed)="share.set({ status: 'closed' })" />
+
+<!-- Разбор YAML нужен только для импорта: отдельный чанк, грузится при первом открытии. -->
+@defer (when importer().open) {
+  <ll-import-dialog
+    [open]="importer().open"
+    [initial]="importer().files"
+    (imported)="applyImport($event)"
+    (closed)="importer.set({ open: false, files: [] })"
+  />
+}

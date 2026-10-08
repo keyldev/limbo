@@ -26,6 +26,7 @@
     "@foblex/utils": "^1.1.1",
     "@loadline/api-client": "workspace:*",
     "@loadline/engine": "workspace:*",
+    "@loadline/import": "workspace:*",
     "@loadline/model": "workspace:*",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"

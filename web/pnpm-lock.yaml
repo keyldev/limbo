@@ -46,6 +46,9 @@ importers:
       '@loadline/engine':
         specifier: workspace:*
         version: link:../packages/engine
+      '@loadline/import':
+        specifier: workspace:*
+        version: link:../packages/import
       '@loadline/model':
         specifier: workspace:*
         version: link:../packages/model
@@ -116,6 +119,22 @@ importers:
       fast-check:
         specifier: ^4.0.0
         version: 4.10.2
+      typescript:
+        specifier: ~6.0.2
+        version: 6.0.3
+      vitest:
+        specifier: ^5.0.0
+        version: 5.0.3(jsdom@30.1.1)(vite@8.3.0(esbuild@0.28.2)(sass-embedded@1.104.1)(sass@1.104.1))
+
+  packages/import:
+    dependencies:
+      '@loadline/model':
+        specifier: workspace:*
+        version: link:../model
+    devDependencies:
+      '@loadline/engine':
+        specifier: workspace:*
+        version: link:../engine
       typescript:
         specifier: ~6.0.2
         version: 6.0.3

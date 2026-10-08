@@ -1,0 +1,28 @@
+{
+  "name": "@loadline/import",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Импорт схемы limbo из конфигов: docker-compose, Caddyfile, nginx.conf. Чистый TypeScript, без Angular и без DOM.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@loadline/model": "workspace:*"
+  },
+  "devDependencies": {
+    "@loadline/engine": "workspace:*",
+    "typescript": "~6.0.2",
+    "vitest": "^5.0.0"
+  }
+}

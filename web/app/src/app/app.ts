@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import type { ImportResult } from '@loadline/import';
 import type { LoadlineDocument } from '@loadline/model';
 import { Board } from './board/board';
 import { FpsMeter } from './board/fps-meter';
+import { ImportDialog } from './import/import-dialog';
 import { STRESS_SCENARIO, stressDocument } from './board/stress';
 import { EditorStore } from './editor/editor-store';
 import { Inspector } from './inspector/inspector';
@@ -27,7 +29,7 @@ function benchMode(): boolean {
 @Component({
   selector: 'app-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Board, FpsMeter, Inspector, EventLog, Palette, ShareDialog],
+  imports: [Board, FpsMeter, ImportDialog, Inspector, EventLog, Palette, ShareDialog],
   templateUrl: './app.html',
   styleUrl: './app.css',
   host: {
@@ -54,6 +56,11 @@ export class App {
   /** Какой сценарий выбран в списке. Пусто — своя схема (из ссылки, файла или автосохранения). */
   protected readonly scenarioFile = signal('');
   protected readonly share = signal<ShareState>({ status: 'closed' });
+  /** Окно импорта из compose: открыто ли и с какими файлами (перетащенными на доску). */
+  protected readonly importer = signal<{ open: boolean; files: readonly File[] }>({
+    open: false,
+    files: [],
+  });
   protected readonly theme = signal<Theme>('dark');
 
   protected readonly rps = computed(() => this.store.doc()?.traffic.rps ?? 0);
@@ -111,7 +118,8 @@ export class App {
       this.persistence.clearLocationLink();
       const file = this.spec.scenarios.find((s) => s.file === `${scenario}.loadline.json`)?.file;
       if (!file) {
-        if (fresh && !this.restoreAutosave()) await this.loadScenario(this.spec.scenarios[0]!.file, true);
+        if (fresh && !this.restoreAutosave())
+          await this.loadScenario(this.spec.scenarios[0]!.file, true);
         this.store.push('warn', `Сценария «${scenario}» нет, открыта прежняя схема`);
         return true;
       }
@@ -175,11 +183,31 @@ export class App {
     }
   }
 
+  /** .loadline.json открывается сразу, остальное (compose, Caddyfile, nginx.conf) — через окно импорта. */
   protected onFileDrop(e: DragEvent): void {
-    const file = e.dataTransfer?.files[0];
-    if (!file) return;
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    if (!files.length) return;
     e.preventDefault();
-    void this.importFile(file);
+    if (files.length === 1 && files[0]!.name.toLowerCase().endsWith('.json'))
+      void this.importFile(files[0]);
+    else this.importer.set({ open: true, files });
+  }
+
+  protected openImporter(): void {
+    this.importer.set({ open: true, files: [] });
+  }
+
+  protected applyImport(r: ImportResult): void {
+    this.importer.set({ open: false, files: [] });
+    const skipped = r.services.filter((s) => s.skipped).map((s) => s.name);
+    this.openDocument(r.doc, { note: 'Импортирована из конфигов схема' });
+    for (const note of [...r.notes].reverse()) this.store.push('info', note);
+    this.store.push(
+      'warn',
+      `Узлов: ${r.doc.nodes.length - 1}` +
+        (skipped.length ? `, пропущены: ${skipped.join(', ')}` : '') +
+        '. Ёмкости — пресеты по умолчанию, поправьте их в инспекторе',
+    );
   }
 
   protected async shareLink(): Promise<void> {
