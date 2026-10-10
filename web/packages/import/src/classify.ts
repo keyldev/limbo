@@ -105,6 +105,45 @@ const NAME_WORDS: readonly (readonly [Role, ReadonlySet<string>])[] = [
 
 const REPLICA_WORDS = words('replica replicas slave standby read ro secondary follower');
 
+/**
+ * Известные порты: по ним узнаётся база или брокер в своём образе (weaveworksdemos/user-db
+ * слушает 27017 — это MongoDB, хотя в имени «db»). Неоднозначные (9000, 8080) не берём.
+ */
+const PORT_WORDS: Readonly<Record<string, string>> = {
+  '5432': 'postgres',
+  '3306': 'mysql',
+  '1433': 'mssql',
+  '26257': 'cockroachdb',
+  '1521': 'oracle',
+  '27017': 'mongo',
+  '9042': 'cassandra',
+  '7687': 'neo4j',
+  '5984': 'couchdb',
+  '6379': 'redis',
+  '11211': 'memcached',
+  '5672': 'rabbitmq',
+  '9092': 'kafka',
+  '4222': 'nats',
+  '61616': 'activemq',
+  '1883': 'mosquitto',
+  '9200': 'elasticsearch',
+  '7700': 'meilisearch',
+  '8108': 'typesense',
+};
+
+/** Порты, на которых обычно слушает HTTP-приложение, а не база или брокер. */
+const HTTP_PORTS = words('80 443 3000 5000 8000 8080 8443 http https');
+
+const DATA_KINDS: ReadonlySet<NodeKind> = new Set([
+  'cache',
+  'queue',
+  'sql-primary',
+  'sql-replica',
+  'nosql',
+  'object-storage',
+  'search',
+]);
+
 const tokens = (s: string): string[] => s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
 
 /** Имя образа без реестра, тега и дайджеста: ghcr.io/org/api:1.2@sha256:… → ghcr.io/org/api. */
@@ -132,6 +171,8 @@ export interface ServiceFacts {
   /** command и entrypoint одной строкой: celery worker, sidekiq и т. п. */
   command: string;
   env: Readonly<Record<string, string>>;
+  /** Порты контейнера: номера и имена (в k8s у порта бывает имя mongo, mysql). */
+  ports?: readonly string[];
 }
 
 /** Угадывает роль контейнера по образу, имени и команде. */
@@ -151,10 +192,23 @@ export function classify(s: ServiceFacts): Classified {
     const byImage = image ? match(IMAGE_WORDS, tokens(image)) : null;
     if (byImage) found = { role: byImage.role, why: `образ ${base || image}` };
   }
+  if (!found && s.ports?.length) {
+    // Порт говорит о технологии точнее имени, но обвязку по нему не узнать.
+    const portToks = s.ports.flatMap((p) => [PORT_WORDS[p] ?? '', ...tokens(p)]).filter(Boolean);
+    const byPort = match(IMAGE_WORDS.slice(2), portToks);
+    if (byPort) {
+      const port = s.ports.find((p) => PORT_WORDS[p] === byPort.word || tokens(p).includes(byPort.word));
+      found = { role: byPort.role, why: `порт ${port}` };
+    }
+  }
   if (!found) {
     // redis-worker — это воркер, а не кэш: в имени «воркер» сильнее названия технологии.
     const byName = match([NAME_WORDS[1]!, ...IMAGE_WORDS, ...NAME_WORDS.slice(2)], nameToks);
-    if (byName) found = { role: byName.role, why: `«${byName.word}» в имени` };
+    // queue-master на порту 80 — сервис, который работает с очередью, а не сама очередь.
+    const http = s.ports?.find((p) => HTTP_PORTS.has(p));
+    if (byName && http && 'kind' in byName.role && DATA_KINDS.has(byName.role.kind))
+      found = { role: { kind: 'service' }, why: `«${byName.word}» в имени, но слушает HTTP-порт ${http}` };
+    else if (byName) found = { role: byName.role, why: `«${byName.word}» в имени` };
   }
   if (!found) {
     const byCmd = match(NAME_WORDS.slice(1, 2), cmdToks);

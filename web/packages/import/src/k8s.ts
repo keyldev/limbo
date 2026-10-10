@@ -397,6 +397,16 @@ export function parseKubernetes(texts: readonly string[]): KubeManifests {
       links: [],
       hostnames: [],
       replicas: Math.max(0, Math.round(replicas)),
+      ports: main
+        ? [
+            ...new Set(
+              list(main['ports'])
+                .map(obj)
+                .flatMap((p) => [str(p['containerPort']), str(p['name'])])
+                .filter(Boolean),
+            ),
+          ]
+        : [],
       published: false,
       labels,
       mounts: [],
@@ -409,7 +419,13 @@ export function parseKubernetes(texts: readonly string[]): KubeManifests {
         why: m.kind === 'CronJob' ? 'запускается по расписанию' : 'одноразовая задача',
       };
     } else if (queueRefs) {
-      const c = classify({ name, ...(w.image ? { image: w.image } : {}), command: w.command, env });
+      const c = classify({
+        name,
+        ...(w.image ? { image: w.image } : {}),
+        command: w.command,
+        env,
+        ports: w.ports,
+      });
       if ('kind' in c.role && c.role.kind === 'service')
         w.role = { role: { kind: 'worker' }, why: 'KEDA масштабирует его по очереди' };
     }
@@ -425,6 +441,7 @@ export function parseKubernetes(texts: readonly string[]): KubeManifests {
     const spec = obj(o['spec']);
     const base = {
       command: '',
+      ports: [],
       env: {},
       dependsOn: [],
       links: [],

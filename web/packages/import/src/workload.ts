@@ -15,6 +15,8 @@ export interface Workload {
   /** Под какими именами он виден в сети: имя сервиса, container_name, алиасы, DNS сервисов k8s. */
   hostnames: string[];
   replicas: number;
+  /** Порты, которые слушает: номера и имена. По ним узнаётся база в своём образе. */
+  ports: string[];
   /** Опубликован наружу: кандидат во вход системы. */
   published: boolean;
   labels: Record<string, string>;

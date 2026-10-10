@@ -203,7 +203,14 @@ export function importConfigs(
     const c: Classified =
       s.replicas === 0
         ? { role: { skip: 'infra' }, why: 'replicas: 0' }
-        : (s.role ?? classify({ name: s.name, image: s.image, command: s.command, env: s.env }));
+        : (s.role ??
+          classify({
+            name: s.name,
+            image: s.image,
+            command: s.command,
+            env: s.env,
+            ports: s.ports,
+          }));
     const why = s.origin ? `${s.origin}, ${c.why}` : c.why;
     units.set(s.name, { name: s.name, ...c, why, replicas: Math.max(1, s.replicas), published: s.published });
   }
@@ -328,6 +335,8 @@ export function importConfigs(
       );
       continue;
     }
+    // У воркера redis — обычно брокер задач (celery, sidekiq, rq), а не кэш перед базой.
+    if (kindOf(name) === 'worker') continue;
     const stores = outs.filter((b) => STORE_KINDS.has(kindOf(b)!));
     if (cache) for (const db of stores) chain(name, cache, db);
   }

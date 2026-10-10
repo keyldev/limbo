@@ -85,6 +85,16 @@ function aliasesOf(v: unknown): string[] {
   return Object.values(v).flatMap((net) => (isObj(net) ? list(net['aliases']).map(str) : []));
 }
 
+/** Порты контейнера из ports и expose: «127.0.0.1:5080:8080/tcp» → 8080, { target: 5432 } → 5432. */
+function portsOf(svc: Obj): string[] {
+  const out = [...list(svc['ports']), ...list(svc['expose'])].map((p) => {
+    if (isObj(p)) return str(p['target']);
+    const s = str(p).split('/')[0]!;
+    return s.slice(s.lastIndexOf(':') + 1).split('-')[0]!;
+  });
+  return [...new Set(out.filter((p) => /^\d+$/.test(p)))];
+}
+
 function replicasOf(svc: Obj): number {
   const deploy = isObj(svc['deploy']) ? svc['deploy'] : {};
   const n = Number(deploy['replicas'] ?? svc['scale'] ?? 1);
@@ -131,6 +141,7 @@ export function parseCompose(texts: readonly string[]): ComposeFile {
       links: list(svc['links']).map((l) => str(l).split(':')[0]!).filter(Boolean),
       hostnames: [...new Set(hostnames)],
       replicas: replicasOf(svc),
+      ports: portsOf(svc),
       published: list(svc['ports']).length > 0,
       labels: labelsOf(svc['labels']),
       mounts: mountsOf(svc['volumes']),

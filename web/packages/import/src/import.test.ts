@@ -64,6 +64,21 @@ describe('classify', () => {
     expect(k('backend')).toEqual({ kind: 'service' });
   });
 
+  it('порт сильнее имени: свой образ user-db на 27017 — MongoDB, queue-master на 80 — сервис', () => {
+    const c = (name: string, ports: string[], image = `weaveworksdemos/${name}:0.3.0`) =>
+      classify({ name, image, command: '', env: {}, ports });
+    expect(c('user-db', ['27017', 'mongo'])).toEqual({ role: { kind: 'nosql' }, why: 'порт 27017' });
+    expect(c('catalogue-db', ['3306']).role).toEqual({ kind: 'sql-primary' });
+    expect(c('sessions', ['redis']).role).toEqual({ kind: 'cache' });
+    expect(c('queue-master', ['80'])).toEqual({
+      role: { kind: 'service' },
+      why: '«queue» в имени, но слушает HTTP-порт 80',
+    });
+    expect(c('queue', []).role).toEqual({ kind: 'queue' });
+    // Образ сильнее порта: nginx на 6379 остаётся балансировщиком.
+    expect(c('edge', ['6379'], 'nginx:1.27').role).toEqual({ kind: 'load-balancer' });
+  });
+
   it('реплика базы — по имени или по переменной bitnami', () => {
     expect(
       classify({ name: 'postgres-replica', image: 'postgres:17', command: '', env: {} }).role,
@@ -172,6 +187,37 @@ describe('importConfigs', () => {
       expect(r.system.incomingRps).toBe(1000);
       expect(r.system.servedRps).toBeGreaterThan(0);
     }
+  });
+
+  it('у воркера redis — брокер, а не кэш перед базой (example-voting-app)', () => {
+    const { doc } = importConfigs([
+      {
+        name: 'compose.yaml',
+        text: `services:
+  vote:
+    build: ./vote
+    ports: ["8080:80"]
+    depends_on: [redis]
+  result:
+    build: ./result
+    ports: ["8081:80"]
+    depends_on: [db]
+  worker:
+    build: ./worker
+    depends_on: [redis, db]
+  redis: { image: redis:alpine }
+  db: { image: postgres:15-alpine }
+`,
+      },
+    ]);
+    expect(arrows(doc)).toEqual([
+      'result → db',
+      'vote → redis',
+      'worker → db',
+      'worker → redis',
+      'Клиенты → result',
+      'Клиенты → vote',
+    ]);
   });
 
   it('основная база и реплика: чтения в реплику, записи в основную', () => {
