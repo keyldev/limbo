@@ -14,6 +14,7 @@ import {
   MAX_SOURCE_BYTES,
   SAMPLE_COMPOSE,
   SAMPLE_KUBERNETES,
+  SAMPLE_TERRAFORM,
   detectSource,
   importConfigs,
   type ImportResult,
@@ -22,7 +23,7 @@ import {
 } from '@loadline/import';
 import { kindInfo } from '../catalog/kinds';
 
-const COMPOSE_NAME = 'docker-compose или Kubernetes';
+const COMPOSE_NAME = 'docker-compose, Kubernetes или Terraform';
 const PROXY_NAME = 'конфиг прокси';
 
 const SKIPPED: Record<NonNullable<ImportedService['skipped']>, string> = {
@@ -32,8 +33,16 @@ const SKIPPED: Record<NonNullable<ImportedService['skipped']>, string> = {
   'scaled-to-zero': 'replicas: 0',
 };
 
+/** Примеры: имя без расширения, чтобы вставленный поверх текст узнавался по содержимому. */
+const SAMPLES = {
+  compose: { name: 'пример: docker-compose', text: SAMPLE_COMPOSE },
+  k8s: { name: 'пример: Kubernetes', text: SAMPLE_KUBERNETES },
+  terraform: { name: 'пример: Terraform', text: SAMPLE_TERRAFORM },
+} as const;
+
 /**
- * Окно импорта: docker-compose или манифесты Kubernetes и, если есть, Caddyfile или nginx.conf. Схема собирается
+ * Окно импорта: docker-compose, манифесты Kubernetes или Terraform и, если есть, Caddyfile
+ * или nginx.conf. Схема собирается
  * прямо в браузере при каждом изменении текста, до открытия видно, что как угадано.
  */
 @Component({
@@ -43,10 +52,11 @@ const SKIPPED: Record<NonNullable<ImportedService['skipped']>, string> = {
     <dialog #dialog (close)="closed.emit()" aria-labelledby="ll-import-title">
       <h2 id="ll-import-title">Импорт из конфигов</h2>
       <p class="note">
-        Вставьте docker-compose.yml или манифесты Kubernetes (<code>kubectl get -o yaml</code>,
-        <code>helm template</code>): типы компонентов угадываются по образам и именам, связи — по
-        depends_on, Service и Ingress, адресам в переменных окружения и конфигу прокси. Всё
-        считается в браузере, файлы никуда не уходят.
+        Вставьте docker-compose.yml, манифесты Kubernetes (<code>kubectl get -o yaml</code>,
+        <code>helm template</code>) или файлы Terraform: типы компонентов угадываются по образам,
+        именам и ресурсам облака, связи — по depends_on, Service и Ingress, ссылкам между ресурсами,
+        адресам в переменных окружения и конфигу прокси. Всё считается в браузере, файлы никуда не
+        уходят.
       </p>
 
       <div class="sources">
@@ -54,7 +64,7 @@ const SKIPPED: Record<NonNullable<ImportedService['skipped']>, string> = {
           <span>{{ composeName() }}</span>
           <textarea
             spellcheck="false"
-            placeholder="services:&#10;  api:&#10;    image: …&#10;&#10;или apiVersion: apps/v1&#10;kind: Deployment"
+            placeholder='services:&#10;  api:&#10;    image: …&#10;&#10;или apiVersion: apps/v1&#10;kind: Deployment&#10;&#10;или resource "aws_ecs_service" …'
             [value]="compose()"
             (input)="setCompose($any($event.target).value)"
           ></textarea>
@@ -81,6 +91,7 @@ const SKIPPED: Record<NonNullable<ImportedService['skipped']>, string> = {
         />
         <button type="button" (click)="useSample('compose')">Пример compose</button>
         <button type="button" (click)="useSample('k8s')">Пример Kubernetes</button>
+        <button type="button" (click)="useSample('terraform')">Пример Terraform</button>
       </div>
 
       @if (fileError(); as message) {
@@ -324,21 +335,23 @@ export class ImportDialog {
     if (!text.trim()) this.proxyName.set(PROXY_NAME);
   }
 
-  protected useSample(kind: 'compose' | 'k8s'): void {
+  protected useSample(kind: keyof typeof SAMPLES): void {
     this.fileError.set(null);
-    this.compose.set(kind === 'k8s' ? SAMPLE_KUBERNETES : SAMPLE_COMPOSE);
-    this.composeName.set(kind === 'k8s' ? 'shop.yaml' : 'docker-compose.yml');
+    this.compose.set(SAMPLES[kind].text);
+    this.composeName.set(SAMPLES[kind].name);
     this.proxy.set('');
     this.proxyName.set(PROXY_NAME);
   }
 
   /**
    * Раскладывает файлы по полям: compose или манифесты — в первое, Caddyfile или nginx.conf —
-   * во второе. Несколько манифестов (папка с yaml) склеиваются через ---.
+   * во второе. Несколько манифестов (папка с yaml) склеиваются через ---, несколько .tf и
+   * .tfvars — просто подряд.
    */
   protected async addFiles(files: Iterable<File> | ArrayLike<File>): Promise<void> {
     this.fileError.set(null);
     const manifests: { name: string; text: string }[] = [];
+    const terraform: { name: string; text: string }[] = [];
     for (const file of Array.from(files)) {
       if (file.size > MAX_SOURCE_BYTES) {
         this.fileError.set(`${file.name} больше 256 КБ — это не похоже на конфиг`);
@@ -348,6 +361,8 @@ export class ImportDialog {
       const type = detectSource(file.name, text);
       if (type === 'k8s') {
         manifests.push({ name: file.name, text });
+      } else if (type === 'terraform') {
+        terraform.push({ name: file.name, text });
       } else if (type === 'compose') {
         this.compose.set(text);
         this.composeName.set(file.name);
@@ -356,7 +371,7 @@ export class ImportDialog {
         this.proxyName.set(file.name);
       } else {
         this.fileError.set(
-          `${file.name}: не похоже ни на docker-compose, ни на манифест Kubernetes, ни на Caddyfile или nginx.conf`,
+          `${file.name}: не похоже ни на docker-compose, ни на манифест Kubernetes или Terraform, ни на Caddyfile или nginx.conf`,
         );
       }
     }
@@ -364,6 +379,18 @@ export class ImportDialog {
       this.compose.set(manifests.map((m) => m.text.trimEnd()).join('\n---\n') + '\n');
       this.composeName.set(
         manifests.length === 1 ? manifests[0]!.name : `манифесты: ${manifests.length} файлов`,
+      );
+    }
+    if (terraform.length) {
+      // .tfvars в конце: значения переменных читаются после блоков variable.
+      terraform.sort(
+        (a, b) => Number(a.name.endsWith('.tfvars')) - Number(b.name.endsWith('.tfvars')),
+      );
+      this.compose.set(
+        terraform.map((t) => `# ${t.name}\n${t.text.trimEnd()}`).join('\n\n') + '\n',
+      );
+      this.composeName.set(
+        terraform.length === 1 ? terraform[0]!.name : `Terraform: ${terraform.length} файлов`,
       );
     }
   }

@@ -17,7 +17,7 @@ Stack: Angular 22 on the client, .NET 10 on the server. The simulation engine ru
 - **Metrics and inspectors.** System metrics in the header. Node, edge and system inspectors, and every node explains how its numbers were calculated. An event log. Running dots and flow labels on edges. Dark and light themes.
 - **Scenarios:** web app, URL shortener, chat, telemetry, news feed, empty board. Reads and writes can go over separate edges: in the news feed, reads go through the feed cache and publishing goes through a queue.
 - **Saving.** The diagram autosaves in the browser. Open and File import and export `.loadline.json`, or just drop a file onto the board. Share makes a short link via the server, or without a server a link with the compressed diagram inside (ADR 0004).
-- **Import from configs.** Paste or drop a `docker-compose.yml` or Kubernetes manifests (`kubectl get -o yaml`, `helm template`, a folder of YAML), plus a Caddyfile or nginx.conf if you have one, and get a diagram you can load right away. Component types are guessed from images and names; edges come from `depends_on`, Services and Ingresses, hostnames in environment variables, ConfigMaps and Secrets, and proxy upstreams. Replica counts come from the manifests and HPAs; databases and queues run by operators (CloudNativePG, Strimzi, RabbitMQ) are recognised. Every guess is shown before opening; the rules are in `docs/import.md`.
+- **Import from configs.** Paste or drop a `docker-compose.yml`, Kubernetes manifests (`kubectl get -o yaml`, `helm template`, a folder of YAML) or Terraform files (AWS, Google Cloud, Azure), plus a Caddyfile or nginx.conf if you have one, and get a diagram you can load right away. Component types are guessed from images and names; edges come from `depends_on`, Services and Ingresses, references between Terraform resources, hostnames in environment variables, ConfigMaps and Secrets, and proxy upstreams. Replica counts come from the manifests and HPAs; databases and queues run by operators (CloudNativePG, Strimzi, RabbitMQ) are recognised. Every guess is shown before opening; the rules are in `docs/import.md`.
 - **Tests:** engine (golden scenarios and model properties), diagram edits and formatting in the app, server Core tests.
 
 The UI is in Russian for now; translations are welcome.
@@ -41,7 +41,7 @@ limbo/
 │  ├─ packages/engine/       simulation engine, plain TS
 │  ├─ packages/model/        types generated from the JSON Schema
 │  ├─ packages/api-client/   API client
-│  ├─ packages/import/       diagram from docker-compose, Kubernetes, Caddyfile, nginx.conf
+│  ├─ packages/import/       diagram from docker-compose, Kubernetes, Terraform, proxy configs
 │  ├─ landing/               landing page: static at /, live demo on the engine
 │  ├─ scripts/               site assembly: landing at /, board at /app/
 │  └─ app/                   Angular 22

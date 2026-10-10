@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Импорт схемы limbo из конфигов: docker-compose, манифесты Kubernetes, Caddyfile, nginx.conf. Чистый TypeScript, без Angular и без DOM.",
+  "description": "Импорт схемы limbo из конфигов: docker-compose, манифесты Kubernetes, Terraform, Caddyfile, nginx.conf. Чистый TypeScript, без Angular и без DOM.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

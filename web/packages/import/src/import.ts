@@ -3,10 +3,11 @@ import { DEFAULT_PRESET, classify, type Classified, type Role } from './classify
 import { ComposeError, parseCompose } from './compose.js';
 import { KubernetesError, looksLikeKubernetes, parseKubernetes } from './k8s.js';
 import { layeredLayout } from './layout.js';
+import { TerraformError, looksLikeTerraform, parseTerraform } from './terraform.js';
 import { parseCaddyfile, parseNginx, type ProxyConfig } from './proxy.js';
 import type { Workload } from './workload.js';
 
-export type SourceType = 'compose' | 'k8s' | 'caddy' | 'nginx';
+export type SourceType = 'compose' | 'k8s' | 'terraform' | 'caddy' | 'nginx';
 
 export interface ImportSource {
   /** Имя файла: по нему узнаём тип и находим, какой контейнер монтирует конфиг прокси. */
@@ -45,12 +46,14 @@ export const MAX_SOURCE_BYTES = 256 * 1024;
 export function detectSource(name: string, text: string): SourceType | null {
   const n = name.toLowerCase();
   if (/caddyfile[^/\\]*$/.test(n)) return 'caddy';
+  if (/\.(tf|tfvars)$/.test(n)) return 'terraform';
   // Манифест узнаётся по содержимому, даже если поле или файл назван compose.
   const compose = /^services\s*:/m.test(text);
   if (looksLikeKubernetes(text) && !compose) return 'k8s';
   if (/compose[^/\\]*\.ya?ml$/.test(n)) return 'compose';
   if (/nginx[^/\\]*$|\.conf$/.test(n)) return 'nginx';
   if (compose) return 'compose';
+  if (looksLikeTerraform(text)) return 'terraform';
   if (/^\s*reverse_proxy\s/m.test(text)) return 'caddy';
   if (/\b(proxy_pass|upstream\s+[\w.-]+\s*\{)/.test(text)) return 'nginx';
   return null;
@@ -164,13 +167,14 @@ export function importConfigs(
   const unknown = typed.find((s) => !s.type);
   if (unknown)
     throw new ImportError(
-      `${unknown.name}: не похоже ни на docker-compose, ни на манифест Kubernetes, ни на Caddyfile или nginx.conf`,
+      `${unknown.name}: не похоже ни на docker-compose, ни на манифест Kubernetes или Terraform, ни на Caddyfile или nginx.conf`,
     );
   const composeTexts = typed.filter((s) => s.type === 'compose').map((s) => s.text);
   const kubeTexts = typed.filter((s) => s.type === 'k8s').map((s) => s.text);
-  if (composeTexts.length && kubeTexts.length)
+  const tfTexts = typed.filter((s) => s.type === 'terraform').map((s) => s.text);
+  if ([composeTexts, kubeTexts, tfTexts].filter((t) => t.length).length > 1)
     throw new ImportError(
-      'docker-compose и манифесты Kubernetes описывают разные системы — импортируйте что-то одно',
+      'docker-compose, манифесты Kubernetes и Terraform описывают систему по-разному — импортируйте что-то одно',
     );
   const proxies: { source: string; config: ProxyConfig; owner?: string; ownerWhy?: string }[] =
     typed
@@ -179,13 +183,19 @@ export function importConfigs(
         source: s.name,
         config: s.type === 'caddy' ? parseCaddyfile(s.text) : parseNginx(s.text),
       }));
-  if (!composeTexts.length && !kubeTexts.length && !proxies.length)
-    throw new ImportError('Вставьте docker-compose.yml, манифесты Kubernetes, Caddyfile или nginx.conf');
+  if (!composeTexts.length && !kubeTexts.length && !tfTexts.length && !proxies.length)
+    throw new ImportError(
+      'Вставьте docker-compose.yml, манифесты Kubernetes, Terraform, Caddyfile или nginx.conf',
+    );
 
   const notes: string[] = [];
   let compose: { name?: string; services: Workload[] };
   try {
-    if (kubeTexts.length) {
+    if (tfTexts.length) {
+      const t = parseTerraform(tfTexts);
+      compose = { ...(t.name ? { name: t.name } : {}), services: t.workloads };
+      notes.push(...t.notes);
+    } else if (kubeTexts.length) {
       const k = parseKubernetes(kubeTexts);
       compose = { ...(k.name ? { name: k.name } : {}), services: k.workloads };
       proxies.push(...k.proxies);
@@ -194,7 +204,9 @@ export function importConfigs(
       compose = composeTexts.length ? parseCompose(composeTexts) : { services: [] };
     }
   } catch (e) {
-    throw e instanceof ComposeError || e instanceof KubernetesError ? new ImportError(e.message) : e;
+    throw e instanceof ComposeError || e instanceof KubernetesError || e instanceof TerraformError
+      ? new ImportError(e.message)
+      : e;
   }
 
   const units = new Map<string, Unit>();
@@ -355,7 +367,11 @@ export function importConfigs(
   for (const u of entry ?? []) g.add(CLIENT, u.name);
   if (entry) notes.unshift(`Клиенты приходят в ${entry.map((u) => u.name).join(', ')}`);
   else if (!nodes.some((u) => RANK[kindOf(u.name)!] < RANK.cache))
-    notes.unshift('На схеме только базы, кэши и очереди — похоже на окружение для разработки: добавьте сервисы на доске');
+    notes.unshift(
+      tfTexts.length
+        ? 'В конфигурации только базы, хранилища и очереди — сервисы, видимо, описаны в другом месте: добавьте их на доске'
+        : 'На схеме только базы, кэши и очереди — похоже на окружение для разработки: добавьте сервисы на доске',
+    );
   else notes.unshift('Не нашлось, куда приходят клиенты: соедините их со входом сами');
 
   breakCycles(g, notes);
@@ -404,7 +420,11 @@ export function importConfigs(
       title: (
         opts.title ??
         compose.name ??
-        (kubeTexts.length ? 'Импорт из Kubernetes' : 'Импорт из compose')
+        (tfTexts.length
+          ? 'Импорт из Terraform'
+          : kubeTexts.length
+            ? 'Импорт из Kubernetes'
+            : 'Импорт из compose')
       ).slice(0, 200),
       description:
         `Собрано из ${files.join(', ')}. Типы узлов угаданы по образам и именам, ` +
