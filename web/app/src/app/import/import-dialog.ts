@@ -13,6 +13,7 @@ import {
 import {
   MAX_SOURCE_BYTES,
   SAMPLE_COMPOSE,
+  SAMPLE_KUBERNETES,
   detectSource,
   importConfigs,
   type ImportResult,
@@ -21,7 +22,7 @@ import {
 } from '@loadline/import';
 import { kindInfo } from '../catalog/kinds';
 
-const COMPOSE_NAME = 'docker-compose.yml';
+const COMPOSE_NAME = 'docker-compose или Kubernetes';
 const PROXY_NAME = 'конфиг прокси';
 
 const SKIPPED: Record<NonNullable<ImportedService['skipped']>, string> = {
@@ -32,7 +33,7 @@ const SKIPPED: Record<NonNullable<ImportedService['skipped']>, string> = {
 };
 
 /**
- * Окно импорта: docker-compose и, если есть, Caddyfile или nginx.conf. Схема собирается
+ * Окно импорта: docker-compose или манифесты Kubernetes и, если есть, Caddyfile или nginx.conf. Схема собирается
  * прямо в браузере при каждом изменении текста, до открытия видно, что как угадано.
  */
 @Component({
@@ -42,9 +43,10 @@ const SKIPPED: Record<NonNullable<ImportedService['skipped']>, string> = {
     <dialog #dialog (close)="closed.emit()" aria-labelledby="ll-import-title">
       <h2 id="ll-import-title">Импорт из конфигов</h2>
       <p class="note">
-        Вставьте docker-compose.yml: типы компонентов угадываются по образам и именам, связи — по
-        depends_on, адресам в переменных окружения и конфигу прокси. Всё считается в браузере, файлы
-        никуда не уходят.
+        Вставьте docker-compose.yml или манифесты Kubernetes (<code>kubectl get -o yaml</code>,
+        <code>helm template</code>): типы компонентов угадываются по образам и именам, связи — по
+        depends_on, Service и Ingress, адресам в переменных окружения и конфигу прокси. Всё
+        считается в браузере, файлы никуда не уходят.
       </p>
 
       <div class="sources">
@@ -52,7 +54,7 @@ const SKIPPED: Record<NonNullable<ImportedService['skipped']>, string> = {
           <span>{{ composeName() }}</span>
           <textarea
             spellcheck="false"
-            placeholder="services:&#10;  api:&#10;    image: …"
+            placeholder="services:&#10;  api:&#10;    image: …&#10;&#10;или apiVersion: apps/v1&#10;kind: Deployment"
             [value]="compose()"
             (input)="setCompose($any($event.target).value)"
           ></textarea>
@@ -77,7 +79,8 @@ const SKIPPED: Record<NonNullable<ImportedService['skipped']>, string> = {
           hidden
           (change)="addFiles($any($event.target).files); files.value = ''"
         />
-        <button type="button" (click)="useSample()">Вставить пример</button>
+        <button type="button" (click)="useSample('compose')">Пример compose</button>
+        <button type="button" (click)="useSample('k8s')">Пример Kubernetes</button>
       </div>
 
       @if (fileError(); as message) {
@@ -146,6 +149,9 @@ const SKIPPED: Record<NonNullable<ImportedService['skipped']>, string> = {
     h3 {
       margin: 16px 0 8px;
       font-size: 13px;
+    }
+    code {
+      font: 11.5px var(--ll-mono);
     }
     .note {
       margin: 0 0 12px;
@@ -318,17 +324,21 @@ export class ImportDialog {
     if (!text.trim()) this.proxyName.set(PROXY_NAME);
   }
 
-  protected useSample(): void {
+  protected useSample(kind: 'compose' | 'k8s'): void {
     this.fileError.set(null);
-    this.compose.set(SAMPLE_COMPOSE);
-    this.composeName.set(COMPOSE_NAME);
+    this.compose.set(kind === 'k8s' ? SAMPLE_KUBERNETES : SAMPLE_COMPOSE);
+    this.composeName.set(kind === 'k8s' ? 'shop.yaml' : 'docker-compose.yml');
     this.proxy.set('');
     this.proxyName.set(PROXY_NAME);
   }
 
-  /** Раскладывает файлы по полям: compose — в первое, Caddyfile или nginx.conf — во второе. */
+  /**
+   * Раскладывает файлы по полям: compose или манифесты — в первое, Caddyfile или nginx.conf —
+   * во второе. Несколько манифестов (папка с yaml) склеиваются через ---.
+   */
   protected async addFiles(files: Iterable<File> | ArrayLike<File>): Promise<void> {
     this.fileError.set(null);
+    const manifests: { name: string; text: string }[] = [];
     for (const file of Array.from(files)) {
       if (file.size > MAX_SOURCE_BYTES) {
         this.fileError.set(`${file.name} больше 256 КБ — это не похоже на конфиг`);
@@ -336,7 +346,9 @@ export class ImportDialog {
       }
       const text = await file.text();
       const type = detectSource(file.name, text);
-      if (type === 'compose') {
+      if (type === 'k8s') {
+        manifests.push({ name: file.name, text });
+      } else if (type === 'compose') {
         this.compose.set(text);
         this.composeName.set(file.name);
       } else if (type) {
@@ -344,9 +356,15 @@ export class ImportDialog {
         this.proxyName.set(file.name);
       } else {
         this.fileError.set(
-          `${file.name}: не похоже ни на docker-compose, ни на Caddyfile, ни на nginx.conf`,
+          `${file.name}: не похоже ни на docker-compose, ни на манифест Kubernetes, ни на Caddyfile или nginx.conf`,
         );
       }
+    }
+    if (manifests.length) {
+      this.compose.set(manifests.map((m) => m.text.trimEnd()).join('\n---\n') + '\n');
+      this.composeName.set(
+        manifests.length === 1 ? manifests[0]!.name : `манифесты: ${manifests.length} файлов`,
+      );
     }
   }
 

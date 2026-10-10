@@ -43,6 +43,7 @@ const IMAGE_WORDS: readonly (readonly [Role, ReadonlySet<string>])[] = [
       cadvisor promtail fluentd fluent fluentbit logstash kibana filebeat metricbeat netdata
       pgadmin pgadmin4 adminer phpmyadmin redisinsight kafdrop akhq portainer watchtower dozzle
       mailhog mailpit maildev smtp4dev certbot zookeeper consul vault etcd sentry uptime
+      loadgenerator locust k6 jmeter gatling vegeta artillery wrk
     `),
   ],
   [{ skip: 'proxy' }, words('pgbouncer pgpool pgcat odyssey proxysql maxscale twemproxy')],

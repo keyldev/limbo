@@ -2,7 +2,7 @@
  * Разбор YAML в объём, которого хватает docker-compose: блочные словари и списки,
  * flow-коллекции [a, b] и {a: 1}, строки в кавычках, блочные строки | и >, якоря,
  * ссылки и слияние <<. Теги (!reset, !!str) пропускаются. Скаляры — по схеме core YAML 1.2.
- * Сложных ключей (?), нескольких документов в одном файле и директив нет.
+ * Несколько документов через --- читает parseYamlAll. Сложных ключей (?) и директив нет.
  */
 
 export class YamlError extends Error {
@@ -442,25 +442,44 @@ class Flow {
 
 /** Разбирает YAML-документ. Бросает YamlError с номером строки. */
 export function parseYaml(text: string): unknown {
-  const lines: Line[] = [];
-  const src = text.replace(/^﻿/, '').split(/\r?\n/);
-  let started = false;
+  const docs = splitDocuments(text);
+  if (docs.lines.length > 1)
+    throw new YamlError('Несколько документов в одном файле не поддерживаются', docs.lines[1]![0]!.no);
+  return new Parser(docs.lines[0] ?? [], docs.src).parse();
+}
+
+/**
+ * Разбирает поток документов через ---, как в манифестах Kubernetes и выводе helm template.
+ * Пустые документы пропускаются.
+ */
+export function parseYamlAll(text: string): unknown[] {
+  const docs = splitDocuments(text);
+  return docs.lines.map((lines) => new Parser(lines, docs.src).parse());
+}
+
+function splitDocuments(text: string): { lines: Line[][]; src: string[] } {
+  const docs: Line[][] = [];
+  let lines: Line[] = [];
+  const flush = (): void => {
+    if (lines.length) docs.push(lines);
+    lines = [];
+  };
+  const src = text.replace(/^\uFEFF/, '').split(/\r?\n/);
   for (let n = 0; n < src.length; n++) {
     const raw = src[n]!;
     if (/^(---|\.\.\.)(\s|$)/.test(raw)) {
-      if (started && raw.startsWith('---'))
-        throw new YamlError('Несколько документов в одном файле не поддерживаются', n + 1);
+      flush();
       const after = raw.slice(3).trim();
       if (!after || after.startsWith('#')) continue;
     }
-    if (/^\s*%/.test(raw) && !started) continue;
+    if (/^\s*%/.test(raw) && !lines.length) continue;
     const indentMatch = /^[ \t]*/.exec(raw)![0];
     if (indentMatch.includes('\t') && raw.trim())
       throw new YamlError('Табуляция в отступе: YAML разрешает только пробелы', n + 1);
     const content = stripComment(raw.slice(indentMatch.length));
     if (!content) continue;
-    started = true;
     lines.push({ no: n + 1, indent: indentMatch.length, text: content, raw });
   }
-  return new Parser(lines, src).parse();
+  flush();
+  return { lines: docs, src };
 }

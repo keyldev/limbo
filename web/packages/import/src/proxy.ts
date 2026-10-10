@@ -1,6 +1,7 @@
 /** Конфиг прокси: из него берём только то, куда он проксирует. */
 export interface ProxyConfig {
-  flavor: 'caddy' | 'nginx';
+  /** ingress — вход из манифестов Kubernetes: Ingress, HTTPRoute, VirtualService. */
+  flavor: 'caddy' | 'nginx' | 'ingress';
   /** Хосты апстримов в порядке появления, без повторов. */
   upstreams: string[];
 }

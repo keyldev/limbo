@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { YamlError, parseYaml } from './yaml.js';
+import { YamlError, parseYaml, parseYamlAll } from './yaml.js';
 
 describe('parseYaml', () => {
   it('словари, списки, скаляры core schema', () => {
@@ -172,5 +172,30 @@ services:
     expect(err('a: *missing').message).toMatch(/Нет якоря/);
     expect(err('a: 1\n    b: 2').message).toMatch(/Лишний отступ/);
     expect(err('a: 1\n---\nb: 2').message).toMatch(/Несколько документов/);
+  });
+});
+
+describe('parseYamlAll', () => {
+  it('документы через ---, пустые пропускаются, номера строк сквозные', () => {
+    const src = [
+      '# Source: chart/templates/a.yaml',
+      'a: 1',
+      '---',
+      '---',
+      '# только комментарий',
+      '--- # тоже разделитель',
+      'b: |',
+      '  text',
+      '...',
+      'c: [1, 2]',
+    ].join('\n');
+    expect(parseYamlAll(src)).toEqual([{ a: 1 }, { b: 'text\n' }, { c: [1, 2] }]);
+    expect(parseYamlAll('')).toEqual([]);
+    try {
+      parseYamlAll('a: 1\n---\nb: [1\n');
+      throw new Error('ждали ошибку');
+    } catch (e) {
+      expect((e as YamlError).line).toBe(3);
+    }
   });
 });

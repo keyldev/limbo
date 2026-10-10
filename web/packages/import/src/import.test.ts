@@ -47,6 +47,8 @@ describe('classify', () => {
     ['prometheuscommunity/postgres-exporter', 'infra'],
     ['mongo-express', 'infra'],
     ['provectuslabs/kafka-ui', 'infra'],
+    ['grafana/k6', 'infra'],
+    ['locustio/locust', 'infra'],
     ['edoburu/pgbouncer', 'proxy'],
   ])('%s пропускается как %s', (image, skip) => {
     expect(classify({ name: 'x', image, command: '', env: {} }).role).toEqual({ skip });

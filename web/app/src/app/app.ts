@@ -183,7 +183,7 @@ export class App {
     }
   }
 
-  /** .loadline.json открывается сразу, остальное (compose, Caddyfile, nginx.conf) — через окно импорта. */
+  /** .loadline.json открывается сразу, остальное (compose, манифесты k8s, Caddyfile, nginx.conf) — через окно импорта. */
   protected onFileDrop(e: DragEvent): void {
     const files = Array.from(e.dataTransfer?.files ?? []);
     if (!files.length) return;

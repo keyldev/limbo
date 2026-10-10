@@ -1,23 +1,8 @@
+import type { Workload } from './workload.js';
 import { YamlError, parseYaml } from './yaml.js';
 
-/** Сервис из docker-compose — только то, что нужно для схемы. */
-export interface ComposeService {
-  name: string;
-  image?: string;
-  /** command и entrypoint одной строкой. */
-  command: string;
-  env: Record<string, string>;
-  dependsOn: { name: string; completed: boolean }[];
-  links: string[];
-  /** Под какими именами контейнер виден в сети: имя сервиса, container_name, hostname, алиасы. */
-  hostnames: string[];
-  replicas: number;
-  /** Порты опубликованы наружу: кандидат во вход системы. */
-  published: boolean;
-  labels: Record<string, string>;
-  /** Что примонтировано с хоста: ./Caddyfile:/etc/caddy/Caddyfile → ./Caddyfile. */
-  mounts: string[];
-}
+/** Сервис из docker-compose. */
+export type ComposeService = Workload;
 
 export interface ComposeFile {
   name?: string;

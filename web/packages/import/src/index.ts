@@ -1,5 +1,6 @@
 export { DEFAULT_PRESET, classify, imageName } from './classify.js';
 export { parseCompose } from './compose.js';
+export { parseKubernetes } from './k8s.js';
 export {
   ImportError,
   MAX_SOURCE_BYTES,
@@ -11,4 +12,4 @@ export {
   type SourceType,
 } from './import.js';
 export { parseCaddyfile, parseNginx } from './proxy.js';
-export { SAMPLE_COMPOSE } from './sample.js';
+export { SAMPLE_COMPOSE, SAMPLE_KUBERNETES } from './sample.js';
